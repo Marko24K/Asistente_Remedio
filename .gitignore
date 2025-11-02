@@ -44,9 +44,18 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
+#Android
+android/.gradle/
+android/app/build/
+android/.idea/
+android/local.properties
+
 # VS Code
 .vscode/
 
 # Misc
 *.log
 *.tmp
+
+#credenciales
+android/app/google-services.json
