@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "131723769505",
+    "project_id": "asistenteremedios",
+    "storage_bucket": "asistenteremedios.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:131723769505:android:27da010ac207a95f8b22e0",
+        "android_client_info": {
+          "package_name": "com.example.asistente_remedios"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAqh_Fls2-36rd13Xs6c6maL5hm0hl_-jA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
