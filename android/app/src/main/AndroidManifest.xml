@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
+<<<<<<< HEAD
         android:label="asistente_remedio"
+=======
+        android:label="asistente_remedios"
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

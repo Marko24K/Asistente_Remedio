@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 # asistente_remedio
+=======
+# asistente_remedios
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
 
 A new Flutter project.
 

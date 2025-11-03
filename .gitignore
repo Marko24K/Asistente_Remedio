@@ -43,3 +43,22 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+<<<<<<< HEAD
+=======
+
+#Android
+android/.gradle/
+android/app/build/
+android/.idea/
+android/local.properties
+
+# VS Code
+.vscode/
+
+# Misc
+*.log
+*.tmp
+
+#credenciales
+android/app/google-services.json
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00

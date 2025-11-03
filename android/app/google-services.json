@@ -1,21 +1,37 @@
 {
   "project_info": {
+<<<<<<< HEAD
     "project_number": "227965339275",
     "project_id": "studio-3549802876-46c9e",
     "storage_bucket": "studio-3549802876-46c9e.firebasestorage.app"
+=======
+    "project_number": "131723769505",
+    "project_id": "asistenteremedios",
+    "storage_bucket": "asistenteremedios.firebasestorage.app"
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
   },
   "client": [
     {
       "client_info": {
+<<<<<<< HEAD
         "mobilesdk_app_id": "1:227965339275:android:13a1948f415be79ac5b68e",
         "android_client_info": {
           "package_name": "com.example.asistente_remedio"
+=======
+        "mobilesdk_app_id": "1:131723769505:android:27da010ac207a95f8b22e0",
+        "android_client_info": {
+          "package_name": "com.example.asistente_remedios"
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
         }
       },
       "oauth_client": [],
       "api_key": [
         {
+<<<<<<< HEAD
           "current_key": "AIzaSyAfk7m4sTdp-v5dmsgRkZCkv8pVe5WajzE"
+=======
+          "current_key": "AIzaSyAqh_Fls2-36rd13Xs6c6maL5hm0hl_-jA"
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
         }
       ],
       "services": {

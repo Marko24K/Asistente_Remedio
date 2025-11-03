@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 name: asistente_remedio
+=======
+name: asistente_remedios
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
 description: "A new Flutter project."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -31,6 +35,10 @@ dependencies:
   flutter:
     sdk: flutter
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
@@ -40,9 +48,14 @@ dependencies:
   firebase_auth: ^6.1.1
   firebase_messaging: ^16.0.3
   connectivity_plus: ^7.0.0
+<<<<<<< HEAD
   provider: ^6.1.5+1
   sqflite: ^2.4.2
   path: ^1.9.0
+=======
+  sqflite: ^2.4.2
+  provider: ^6.1.5+1
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
 
 
 dev_dependencies:
@@ -71,7 +84,10 @@ flutter:
   assets:
     - assets/medicamentos/medicamentos_cl.json
     - assets/trivias/trivias.json
+<<<<<<< HEAD
     - assets/images
+=======
+>>>>>>> 8bafcc5ba7353f14c12d83da5d43d84a537e1f00
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
