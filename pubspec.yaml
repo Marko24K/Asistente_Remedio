@@ -71,7 +71,7 @@ flutter:
   assets:
     - assets/medicamentos/medicamentos_cl.json
     - assets/trivias/trivias.json
-    - assets/images
+    - assets/images/presentacion.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

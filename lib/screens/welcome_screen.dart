@@ -81,8 +81,8 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
               // Imagen principal
               Image.asset(
-                'assets/images/welcome_pill.png',
-                height: 250,
+                'assets/images/presentacion.png',
+                height: 500,
                 fit: BoxFit.contain,
               ),
 

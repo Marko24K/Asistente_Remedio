@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'AsistenteRemedios',
+      title: 'Asistente Remedios',
       home: WelcomeScreen(),
     );
   }
