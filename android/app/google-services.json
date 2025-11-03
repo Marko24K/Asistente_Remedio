@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "227965339275",
+    "project_id": "studio-3549802876-46c9e",
+    "storage_bucket": "studio-3549802876-46c9e.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:227965339275:android:13a1948f415be79ac5b68e",
+        "android_client_info": {
+          "package_name": "com.example.asistente_remedio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfk7m4sTdp-v5dmsgRkZCkv8pVe5WajzE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
