@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
-import 'medicamento_screen.dart';
+import 'role_selection_screen.dart';
 
 class WelcomeScreen extends StatefulWidget {
   const WelcomeScreen({super.key});
@@ -64,7 +64,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const MedicamentoScreen()),
+      MaterialPageRoute(builder: (_) => const RoleSelectionScreen()),
     );
   }
 
