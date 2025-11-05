@@ -1,78 +1,128 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:io';
 
 class CaregiverDashboardScreen extends StatelessWidget {
   const CaregiverDashboardScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFFFFBFA),
-      appBar: AppBar(
-        title: const Text(
-          "Pacientes a cargo",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Color(0xFF1B4332),
+    // ignore: deprecated_member_use
+    return WillPopScope(
+      onWillPop: () async {
+        final shouldExit = await _showExitDialog(context);
+        if (shouldExit == true) {
+          // 🔹 Cierra la app completamente (funciona en Android y iOS)
+          if (Platform.isAndroid) {
+            SystemNavigator.pop();
+          } else {
+            exit(0);
+          }
+          return true;
+        }
+        return false; // No vuelve atrás
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF8F9FA),
+        appBar: AppBar(
+          title: const Text(
+            "Pacientes a cargo",
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF1B4332),
+            ),
+          ),
+          centerTitle: true,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false, // 👈 Sin flecha atrás
+        ),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return ListView(
+                padding: const EdgeInsets.all(16.0),
+                children: [
+                  _PatientCard(
+                    name: "Ana Pérez",
+                    reminders: 3,
+                    time: "08:00",
+                    condition: "Diabetes tipo 2",
+                    image: "assets/images/paciente1.png",
+                    maxWidth: constraints.maxWidth,
+                  ),
+                  _PatientCard(
+                    name: "Luis Romero",
+                    reminders: 2,
+                    time: "14:00",
+                    condition: "Hipertensión",
+                    image: "assets/images/paciente2.png",
+                    maxWidth: constraints.maxWidth,
+                  ),
+                  _PatientCard(
+                    name: "María López",
+                    reminders: 4,
+                    time: "21:00",
+                    condition: "Artritis",
+                    image: "assets/images/paciente3.png",
+                    maxWidth: constraints.maxWidth,
+                  ),
+                ],
+              );
+            },
           ),
         ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false, // 🔹 elimina la flecha
+        bottomNavigationBar: BottomNavigationBar(
+          backgroundColor: Colors.white,
+          selectedItemColor: const Color(0xFF40916C),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.people_alt_outlined),
+              label: 'Pacientes',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.settings_outlined),
+              label: 'Ajustes',
+            ),
+          ],
+          currentIndex: 0,
+          onTap: (index) {
+            if (index == 1) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Pantalla de ajustes en desarrollo"),
+                ),
+              );
+            }
+          },
+        ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16.0),
-        children: [
-          _PatientCard(
-            name: "Ana Pérez",
-            reminders: 3,
-            time: "08:00",
-            condition: "Diabetes tipo 2",
-            image: "assets/images/paciente1.png",
-          ),
-          _PatientCard(
-            name: "Luis Romero",
-            reminders: 2,
-            time: "14:00",
-            condition: "Hipertensión",
-            image: "assets/images/paciente2.png",
-          ),
-          _PatientCard(
-            name: "María López",
-            reminders: 4,
-            time: "21:00",
-            condition: "Artritis",
-            image: "assets/images/paciente3.png",
-          ),
-        ],
-      ),
+    );
+  }
 
-      // 🔹 Barra inferior de navegación (sin icono de alertas)
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Colors.white,
-        selectedItemColor: const Color(0xFF40916C),
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: true,
-        items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.people_alt_outlined),
-            label: 'Pacientes',
+  /// Diálogo para confirmar salida
+  Future<bool?> _showExitDialog(BuildContext context) {
+    return showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text("¿Deseas salir de la aplicación?"),
+        content: const Text("Se cerrará completamente AsistenteRemedios."),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text("Cancelar"),
           ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.settings_outlined),
-            label: 'Ajustes',
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF40916C),
+            ),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text("Salir"),
           ),
         ],
-        currentIndex: 0,
-        onTap: (index) {
-          if (index == 1) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text("Pantalla de ajustes en desarrollo"),
-              ),
-            );
-          }
-        },
       ),
     );
   }
@@ -84,6 +134,7 @@ class _PatientCard extends StatelessWidget {
   final String time;
   final String condition;
   final String image;
+  final double maxWidth;
 
   const _PatientCard({
     required this.name,
@@ -91,6 +142,7 @@ class _PatientCard extends StatelessWidget {
     required this.time,
     required this.condition,
     required this.image,
+    required this.maxWidth,
   });
 
   @override
@@ -111,8 +163,12 @@ class _PatientCard extends StatelessWidget {
         ],
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(radius: 28, backgroundImage: AssetImage(image)),
+          CircleAvatar(
+            radius: maxWidth * 0.08,
+            backgroundImage: AssetImage(image),
+          ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -120,6 +176,7 @@ class _PatientCard extends StatelessWidget {
               children: [
                 Text(
                   name,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -129,9 +186,13 @@ class _PatientCard extends StatelessWidget {
                 Text(
                   "Condición principal: $condition",
                   style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 6),
-                Row(
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -150,8 +211,8 @@ class _PatientCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
                     Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
                           Icons.access_time,
