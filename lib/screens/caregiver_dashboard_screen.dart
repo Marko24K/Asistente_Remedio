@@ -1,10 +1,17 @@
+import 'dart:io';
+import 'package:asistente_remedio/screens/patient_details.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:io';
 
-class CaregiverDashboardScreen extends StatelessWidget {
+class CaregiverDashboardScreen extends StatefulWidget {
   const CaregiverDashboardScreen({super.key});
 
+  @override
+  State<CaregiverDashboardScreen> createState() =>
+      _CaregiverDashboardScreenState();
+}
+
+class _CaregiverDashboardScreenState extends State<CaregiverDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     // ignore: deprecated_member_use
@@ -12,7 +19,6 @@ class CaregiverDashboardScreen extends StatelessWidget {
       onWillPop: () async {
         final shouldExit = await _showExitDialog(context);
         if (shouldExit == true) {
-          // 🔹 Cierra la app completamente (funciona en Android y iOS)
           if (Platform.isAndroid) {
             SystemNavigator.pop();
           } else {
@@ -20,13 +26,13 @@ class CaregiverDashboardScreen extends StatelessWidget {
           }
           return true;
         }
-        return false; // No vuelve atrás
+        return false;
       },
       child: Scaffold(
         backgroundColor: const Color(0xFFF8F9FA),
         appBar: AppBar(
           title: const Text(
-            "Pacientes a cargo",
+            "AsistenteRemedios",
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Color(0xFF1B4332),
@@ -35,41 +41,123 @@ class CaregiverDashboardScreen extends StatelessWidget {
           centerTitle: true,
           backgroundColor: Colors.white,
           elevation: 0,
-          automaticallyImplyLeading: false, // 👈 Sin flecha atrás
+          automaticallyImplyLeading: false,
         ),
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              return ListView(
-                padding: const EdgeInsets.all(16.0),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE6E6E6)),
+              ),
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _PatientCard(
-                    name: "Ana Pérez",
-                    reminders: 3,
-                    time: "08:00",
-                    condition: "Diabetes tipo 2",
-                    image: "assets/images/paciente1.png",
-                    maxWidth: constraints.maxWidth,
+                  /// --- ENCABEZADO (como en la imagen)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            "Pacientes",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1B4332),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Color(0xFFD8F3DC),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: const [
+                                Icon(
+                                  Icons.people_alt_outlined,
+                                  color: Color(0xFF1B4332),
+                                  size: 16,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  "2",
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF1B4332),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF74C69D),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 12,
+                          ),
+                        ),
+                        onPressed: () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Función de crear paciente"),
+                            ),
+                          );
+                        },
+                        icon: const Icon(
+                          Icons.person_add_alt_1_outlined,
+                          color: Colors.white,
+                          size: 18,
+                        ),
+                        label: const Text(
+                          "Crear paciente",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                  _PatientCard(
-                    name: "Luis Romero",
-                    reminders: 2,
-                    time: "14:00",
-                    condition: "Hipertensión",
-                    image: "assets/images/paciente2.png",
-                    maxWidth: constraints.maxWidth,
-                  ),
+
+                  const SizedBox(height: 16),
+
+                  /// --- TARJETAS DE PACIENTES
                   _PatientCard(
                     name: "María López",
-                    reminders: 4,
-                    time: "21:00",
-                    condition: "Artritis",
-                    image: "assets/images/paciente3.png",
-                    maxWidth: constraints.maxWidth,
+                    age: 78,
+                    reminders: 3,
+                    nextTaken: 1,
+                    nextMissed: 1,
+                    icon: Icons.elderly_woman_outlined,
+                  ),
+                  _PatientCard(
+                    name: "Carlos Pérez",
+                    age: 82,
+                    reminders: 2,
+                    nextTaken: 1,
+                    nextMissed: 0,
+                    icon: Icons.elderly_outlined,
                   ),
                 ],
-              );
-            },
+              ),
+            ),
           ),
         ),
         bottomNavigationBar: BottomNavigationBar(
@@ -102,7 +190,7 @@ class CaregiverDashboardScreen extends StatelessWidget {
     );
   }
 
-  /// Diálogo para confirmar salida
+  /// --- Diálogo de salida ---
   Future<bool?> _showExitDialog(BuildContext context) {
     return showDialog<bool>(
       context: context,
@@ -128,113 +216,61 @@ class CaregiverDashboardScreen extends StatelessWidget {
   }
 }
 
+/// --- Tarjeta de Paciente ---
 class _PatientCard extends StatelessWidget {
   final String name;
+  final int age;
   final int reminders;
-  final String time;
-  final String condition;
-  final String image;
-  final double maxWidth;
+  final int nextTaken;
+  final int nextMissed;
+  final IconData icon;
 
   const _PatientCard({
     required this.name,
+    required this.age,
     required this.reminders,
-    required this.time,
-    required this.condition,
-    required this.image,
-    required this.maxWidth,
+    required this.nextTaken,
+    required this.nextMissed,
+    required this.icon,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            // ignore: deprecated_member_use
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 5,
-            offset: const Offset(0, 3),
-          ),
-        ],
+        color: const Color(0xFFE9F5EE),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFD8F3DC)),
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: maxWidth * 0.08,
-            backgroundImage: AssetImage(image),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: const Color(0xFF74C69D),
+          radius: 24,
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
+        title: Text(
+          "$name - $age años",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1B4332),
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  name,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  "Condición principal: $condition",
-                  style: TextStyle(fontSize: 14, color: Colors.grey[700]),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 6,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE9F5EC),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Text(
-                        "$reminders recordatorios",
-                        style: const TextStyle(
-                          color: Color(0xFF1B4332),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.access_time,
-                          size: 16,
-                          color: Colors.grey,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "Próximo $time",
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
+        ),
+        subtitle: Text(
+          "$reminders recordatorios\nPróximos: 1 · Tomado: $nextTaken · No tomado: $nextMissed",
+          style: const TextStyle(fontSize: 13, color: Colors.black87),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          color: Color(0xFF1B4332),
+          size: 16,
+        ),
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => PatientDetailsScreen()),
+          );
+        },
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'caregiver_login_screen.dart';
-//import 'patient_home_screen.dart';
+import 'patient_home_screen.dart';
+//import 'confirm.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -29,12 +30,12 @@ class RoleSelectionScreen extends StatelessWidget {
               // Opción Paciente
               ElevatedButton.icon(
                 onPressed: () {
-                  /**Navigator.push(
+                  Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const PatientHomeScreen(),
+                      builder: (context) => const PatientHomeScreen(),
                     ),
-                  );*/
+                  );
                 },
                 icon: const Icon(Icons.person, size: 32),
                 label: const Text(

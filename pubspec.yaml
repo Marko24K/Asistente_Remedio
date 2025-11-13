@@ -43,6 +43,8 @@ dependencies:
   provider: ^6.1.5+1
   sqflite: ^2.4.2
   path: ^1.9.0
+  audioplayers: ^6.5.1
+  font_awesome_flutter: ^10.7.0
 
 
 dev_dependencies:
@@ -72,6 +74,8 @@ flutter:
     - assets/medicamentos/medicamentos_cl.json
     - assets/trivias/trivias.json
     - assets/images/presentacion.png
+    - assets/sounds/tono-mensaje-3.mp3
+  
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images
