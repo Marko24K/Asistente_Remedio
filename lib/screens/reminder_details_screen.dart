@@ -8,6 +8,7 @@ class ReminderDetailScreen extends StatefulWidget {
   final String hour;
   final String note;
 
+  // ignore: use_super_parameters
   const ReminderDetailScreen({
     Key? key,
     required this.name,

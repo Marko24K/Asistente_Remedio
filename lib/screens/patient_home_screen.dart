@@ -294,6 +294,7 @@ class _BottomButton extends StatelessWidget {
   final String label;
   final bool active;
 
+  // ignore: use_super_parameters
   const _BottomButton({
     Key? key,
     required this.icon,
