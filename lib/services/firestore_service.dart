@@ -4,6 +4,9 @@ import 'dart:math';
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
 
+  /// Getter público para usar Firestore fuera
+  FirebaseFirestore get db => _db;
+
   Future<String> generarCodigo() async {
     final random = Random();
     return "AM-${100000 + random.nextInt(899999)}";
@@ -20,6 +23,36 @@ class FirestoreService {
     });
 
     return code;
+  }
+
+  /// Devuelve lista de recordatorios del paciente (cada map incluye 'id' con el docId)
+  Future<List<Map<String, dynamic>>> getRemindersForPatient(
+    String patientCode,
+  ) async {
+    final snapshot = await _db
+        .collection('patients')
+        .doc(patientCode)
+        .collection('reminders')
+        .get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      // incluye el id del documento para referencia remota
+      return {
+        'id': doc.id,
+        'medication':
+            data['medication'] ??
+            data['medicationName'] ??
+            data['medicamento'] ??
+            '',
+        'time': data['time'] ?? data['hora'] ?? '',
+        'frequency': data['frequency'] ?? data['frecuencia'] ?? '',
+        'startDate': data['startDate'] ?? data['fechaInicio'] ?? '',
+        'endDate': data['endDate'] ?? data['fechaFin'] ?? '',
+        'status': data['status'] ?? 'active',
+        'notes': data['notes'] ?? data['note'] ?? '',
+      };
+    }).toList();
   }
 
   Future<void> crearRecordatorio(

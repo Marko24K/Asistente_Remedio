@@ -1,52 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../data/database_helper.dart';
 import 'reminder_details_screen.dart';
 
-class PatientHomeScreen extends StatelessWidget {
-  const PatientHomeScreen({super.key});
+class PatientHomeScreen extends StatefulWidget {
+  final String patientCode;
+  const PatientHomeScreen({super.key, required this.patientCode});
+
+  @override
+  State<PatientHomeScreen> createState() => _PatientHomeScreenState();
+}
+
+class _PatientHomeScreenState extends State<PatientHomeScreen> {
+  List<Map<String, dynamic>> reminders = [];
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    loadRemindersFromDB();
+  }
+
+  Future<void> loadRemindersFromDB() async {
+    final data = await DBHelper.getReminders();
+
+    reminders = data.map((r) {
+      return {
+        'name': r['medication'] ?? "Medicamento",
+        'time': r['time'] ?? "--:--",
+        'dose': r['dose'] ?? '',
+        'type': r['type'] ?? '',
+        'notes': r['notes'] ?? '',
+      };
+    }).toList();
+
+    setState(() => loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final reminders = [
-      {
-        'name': 'Paracetamol 500mg',
-        'dose': '1 tableta',
-        'type': 'Pastilla',
-        'next': '08:00',
-        'status': 'pending',
-      },
-      {
-        'name': 'Insulina Rápida',
-        'dose': '6 U',
-        'type': 'Inyección',
-        'next': '12:30',
-        'status': 'pending',
-      },
-      {
-        'name': 'Jarabe Tos',
-        'dose': '10 ml',
-        'type': 'Líquido',
-        'next': '07:10',
-        'status': 'missed',
-      },
-      {
-        'name': 'Vitamina D',
-        'dose': '1 cápsula',
-        'type': 'Cápsula',
-        'next': '20:00',
-        'status': 'pending',
-      },
-    ];
-
     return Scaffold(
       backgroundColor: const Color(0xFFF7F9F8),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 🔹 Encabezado centrado
               Center(
                 child: Container(
                   decoration: BoxDecoration(
@@ -54,216 +53,111 @@ class PatientHomeScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(50),
                   ),
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
+                    horizontal: 18,
+                    vertical: 10,
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.circle, color: Colors.green, size: 12),
-                      SizedBox(width: 8),
-                      Text(
-                        "AsistenteRemedios",
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 16,
-                          color: Color(0xFF1B4332),
-                        ),
-                      ),
-                    ],
+                  child: const Text(
+                    "AsistenteRemedios",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      color: Color(0xFF1B4332),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
 
-              // 🔹 Contenedor principal
-              Container(
-                width: double.infinity,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade300),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Encabezado interno
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Todos los recordatorios",
-                          style: TextStyle(
-                            fontSize: 15.5,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : reminders.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: const [
+                              Icon(
+                                Icons.notifications_none,
+                                size: 50,
+                                color: Colors.grey,
+                              ),
+                              SizedBox(height: 10),
+                              Text(
+                                "Sin recordatorios por ahora",
+                                style: TextStyle(
+                                  fontSize: 17,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                "Tu cuidador los añadirá pronto",
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 7,
-                            vertical: 1.5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            reminders.length.toString(),
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Lista de recordatorios
-                    Column(
-                      children: reminders.map((reminder) {
-                        final isMissed = reminder['status'] == 'missed';
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFE6F4EA),
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: ListTile(
-                            onTap: () {
-                              // 🔸 Navegar a detalle
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => ReminderDetailScreen(
-                                    name: reminder['name']!,
-                                    dose: reminder['dose']!,
-                                    type: reminder['type']!,
-                                    hour: reminder['next']!,
-                                    note:
-                                        'Tomar con agua, después de las comidas. ddsfsdf sdfsdfsdfsdffssssssssssssssssss',
+                        )
+                      : ListView.builder(
+                          itemCount: reminders.length,
+                          itemBuilder: (context, i) {
+                            final r = reminders[i];
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFE6F4EA),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: ListTile(
+                                onTap: () => Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => ReminderDetailScreen(
+                                      name: r['name'],
+                                      dose: r['dose'],
+                                      type: r['type'],
+                                      hour: r['time'],
+                                      note: r['notes'],
+                                    ),
                                   ),
                                 ),
-                              );
-                            },
-                            leading: Container(
-                              width: 38,
-                              height: 38,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.grey.shade300,
-                                  width: 1,
+                                leading: CircleAvatar(
+                                  radius: 22,
+                                  backgroundColor: Colors.white,
+                                  child: FaIcon(
+                                    _getIcon(r['type']),
+                                    size: 20,
+                                    color: Colors.black87,
+                                  ),
                                 ),
-                              ),
-                              child: Center(
-                                child: FaIcon(
-                                  _getIcon(reminder['type']!),
-                                  color: Colors.black87,
-                                  size: 18,
-                                ),
-                              ),
-                            ),
-                            title: Text(
-                              reminder['name']!,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 14.5,
-                                color: Colors.black87,
-                              ),
-                            ),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  "Dosis: ${reminder['dose']}  •  Tipo: ${reminder['type']}",
+                                title: Text(
+                                  r['name'],
                                   style: const TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 17,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                subtitle: Text(
+                                  "Hora: ${r['time']}",
+                                  style: const TextStyle(
+                                    fontSize: 15,
                                     color: Colors.black54,
                                   ),
                                 ),
-                                const SizedBox(height: 3),
-                                isMissed
-                                    ? Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.red.shade100,
-                                          borderRadius: BorderRadius.circular(
-                                            6,
-                                          ),
-                                        ),
-                                        child: Text(
-                                          "No marcada ${reminder['next']}",
-                                          style: const TextStyle(
-                                            color: Colors.red,
-                                            fontSize: 12.5,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      )
-                                    : Text(
-                                        "Próxima: ${reminder['next']}",
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 13,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                              ],
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
-                  ],
-                ),
-              ),
-
-              const Spacer(),
-
-              // 🔹 Barra inferior
-              Container(
-                margin: const EdgeInsets.only(top: 10),
-                padding: const EdgeInsets.symmetric(
-                  vertical: 10,
-                  horizontal: 20,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black12.withOpacity(0.05),
-                      blurRadius: 5,
-                      offset: const Offset(0, -2),
-                    ),
-                  ],
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _BottomButton(
-                      icon: FontAwesomeIcons.pills,
-                      label: 'Remedios',
-                      active: true,
-                    ),
-                    _BottomButton(icon: FontAwesomeIcons.star, label: 'Puntos'),
-                    _BottomButton(
-                      icon: FontAwesomeIcons.gear,
-                      label: 'Configuración',
-                    ),
-                  ],
+                              ),
+                            );
+                          },
+                        ),
                 ),
               ),
             ],
@@ -273,53 +167,15 @@ class PatientHomeScreen extends StatelessWidget {
     );
   }
 
-  IconData _getIcon(String type) {
-    switch (type.toLowerCase()) {
-      case 'pastilla':
-        return FontAwesomeIcons.pills;
-      case 'inyección':
-        return FontAwesomeIcons.syringe;
-      case 'líquido':
-        return FontAwesomeIcons.prescriptionBottle;
-      case 'cápsula':
-        return FontAwesomeIcons.capsules;
-      default:
-        return FontAwesomeIcons.pills;
+  IconData _getIcon(dynamic t) {
+    final type = (t ?? "").toString().toLowerCase();
+
+    if (type.contains("inye")) return FontAwesomeIcons.syringe;
+    if (type.contains("líq") || type.contains("jarabe")) {
+      return FontAwesomeIcons.prescriptionBottle;
     }
-  }
-}
+    if (type.contains("caps")) return FontAwesomeIcons.capsules;
 
-class _BottomButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool active;
-
-  // ignore: use_super_parameters
-  const _BottomButton({
-    Key? key,
-    required this.icon,
-    required this.label,
-    this.active = false,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final activeColor = Colors.green.shade600;
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FaIcon(icon, color: active ? activeColor : Colors.grey, size: 20),
-        const SizedBox(height: 3),
-        Text(
-          label,
-          style: TextStyle(
-            color: active ? activeColor : Colors.grey,
-            fontWeight: active ? FontWeight.bold : FontWeight.normal,
-            fontSize: 13,
-          ),
-        ),
-      ],
-    );
+    return FontAwesomeIcons.pills;
   }
 }

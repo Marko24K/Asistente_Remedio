@@ -4,7 +4,7 @@ plugins {
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
     // Add the dependency for the Google services Gradle plugin
-    id("com.google.gms.google-services") version "4.4.4" apply false
+    id("com.google.gms.google-services") 
 
 }
 dependencies {
@@ -13,6 +13,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("androidx.core:core-ktx:1.12.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+    implementation("com.google.firebase:firebase-firestore")
 
 }
 android {
@@ -20,6 +21,7 @@ android {
     compileSdk = flutter.compileSdkVersion
     ndkVersion = "27.0.12077973"
     compileSdk = 35
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
