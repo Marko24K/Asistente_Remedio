@@ -47,6 +47,7 @@ dependencies:
   font_awesome_flutter: ^10.7.0
   shared_preferences: ^2.2.2
   intl: ^0.18.1
+  timezone: ^0.10.1
 
 
 dev_dependencies:
@@ -76,7 +77,9 @@ flutter:
     - assets/medicamentos/medicamentos_cl.json
     - assets/trivias/trivias.json
     - assets/images/presentacion.png
-    - assets/sounds/tono-mensaje-3.mp3
+    - assets/sounds/correct-ding.mp3
+    - assets/sounds/confirm-no.mp3
+
   
 
   # An image asset can refer to one or more resolution-specific "variants", see

@@ -1,31 +1,47 @@
-import '../data/database_helper.dart';
+/*import '../data/database_helper.dart';
 import 'firestore_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class SyncService {
   final FirestoreService _fs = FirestoreService();
 
-  // Trae paciente por código, guarda local y trae recordatorios
-  Future<bool> syncPatientByCode(String code) async {
-    final docRef = _fs.db.collection('patients').doc(code);
-    final doc = await docRef.get();
+  /// 🔥 Sincroniza paciente usando Firestore REAL
+  Future<bool> syncPatientByCode(String patientId) async {
+    final user = FirebaseAuth.instance.currentUser;
+
+
+    if (user == null) return false;
+
+    final caregiverId = "caregiver123";
+    
+
+    // Obtener doc del paciente en Firestore
+    final doc = await _fs.getPatient(caregiverId, patientId);
+
     if (!doc.exists) return false;
 
     final data = doc.data()!;
-    data['code'] = code;
+    data['code'] = patientId;
 
-    // Guarda paciente localmente
+    // Guardar en SQLite local
     await DBHelper.insertOrUpdatePatientLocal({
-      'code': data['code'],
-      'name': data['name'] ?? data['nombre'],
+      'code': patientId,
+      'name': data['name'],
       'points': data['points'] ?? 0,
     });
 
-    // Obtener recordatorios remotos y guardarlos localmente
-    final reminders = await _fs.getRemindersForPatient(code);
+    // Obtener recordatorios del paciente
+    final reminders = await _fs.db
+      .collection('patients')
+      .doc(code)
+      .collection("reminders")
+      .get();
+
     for (var r in reminders) {
-      await DBHelper.insertOrUpdateReminderLocal(r, code);
+      await DBHelper.insertOrUpdateReminderLocal(r, patientId);
     }
 
     return true;
   }
 }
+*/
