@@ -126,11 +126,11 @@ class DBHelper {
           "medication": "Ibuprofeno",
           "dose": "500g",
           "type": "Pastilla",
-          "hour": "08:00",
+          "hour": "16:30",
           "notes": "Tomar con agua",
           "startDate": "2025-11-21",
           "endDate": "2025-12-24",
-          "frequencyHours": 2,
+          "frequencyHours": 1,
           "nextTrigger": DateTime.now()
               .add(const Duration(hours: 1))
               .toIso8601String(),

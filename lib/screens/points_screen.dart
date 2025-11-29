@@ -305,7 +305,7 @@ class _PointsScreenState extends State<PointsScreen> {
                 Text(
                   disponible
                       ? "¡Disponible para canjear!"
-                      : "Necesitas $costo pts",
+                      : "Necesitas ${costo - puntos} pts",
                   style: TextStyle(
                     color: disponible ? Colors.green.shade700 : Colors.black54,
                     fontSize: 15,

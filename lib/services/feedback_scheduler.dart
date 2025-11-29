@@ -1,7 +1,10 @@
-
+import 'dart:io' show Platform;
 import 'dart:math';
+
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/data/latest.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
+
 import '../data/database_helper.dart';
 import '../main.dart';
 
@@ -9,9 +12,9 @@ class FeedbackScheduler {
   static final FlutterLocalNotificationsPlugin notifications =
       FlutterLocalNotificationsPlugin();
 
-  // ===============================================
+  // ======================================================
   // INIT
-  // ===============================================
+  // ======================================================
   static Future<void> init() async {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -21,10 +24,10 @@ class FeedbackScheduler {
 
     await notifications.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: (resp) async {
+      onDidReceiveNotificationResponse: (NotificationResponse resp) async {
         final payload = resp.payload ?? "";
 
-        // ---- DIFERIDA ----
+        // ---- NOTIFICACIÓN DIFERIDA ----
         if (payload.startsWith("missed|")) {
           final parts = payload.split("|");
           final reminderId = int.tryParse(parts[1]) ?? 0;
@@ -45,7 +48,7 @@ class FeedbackScheduler {
           return;
         }
 
-        // ---- RECORDATORIO NORMAL ----
+        // ---- NOTIFICACIÓN NORMAL ----
         if (payload.startsWith("due|")) {
           final parts = payload.split("|");
           final reminderId = int.tryParse(parts[1]) ?? 0;
@@ -58,11 +61,26 @@ class FeedbackScheduler {
         }
       },
     );
+
+    // ----- Permisos Android -----
+    if (Platform.isAndroid) {
+      final androidPlugin = notifications
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+
+      await androidPlugin?.requestNotificationsPermission();
+      await androidPlugin?.requestExactAlarmsPermission();
+    }
+
+    // ----- Timezone -----
+    tzdata.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation("America/Santiago"));
   }
 
-  // ===============================================
+  // ======================================================
   // NOTIFICACIÓN DIFERIDA
-  // ===============================================
+  // ======================================================
   static Future<void> scheduleDeferredForReminder({
     required int reminderId,
     required String patientCode,
@@ -71,7 +89,6 @@ class FeedbackScheduler {
   }) async {
     final random = Random();
 
-    // Notificación entre 20 y 60 minutos después
     final future = DateTime.now().add(
       Duration(minutes: 20 + random.nextInt(40)),
     );
@@ -87,8 +104,11 @@ class FeedbackScheduler {
         android: AndroidNotificationDetails(
           "feedback_channel",
           "Recordatorios diferidos",
+          channelDescription:
+              "Notificaciones cuando el usuario no confirma la toma",
           importance: Importance.high,
           priority: Priority.high,
+          playSound: true,
         ),
       ),
       payload: "missed|$reminderId|$patientCode",
@@ -97,9 +117,9 @@ class FeedbackScheduler {
     );
   }
 
-  // ===============================================
+  // ======================================================
   // NOTIFICACIÓN DE HORA EXACTA
-  // ===============================================
+  // ======================================================
   static Future<void> scheduleDueReminder({
     required int reminderId,
     required String code,
@@ -117,9 +137,11 @@ class FeedbackScheduler {
       const NotificationDetails(
         android: AndroidNotificationDetails(
           "due_channel",
-          "Recordatorios de hora exacta",
+          "Recordatorios a la hora exacta",
+          channelDescription: "Recordatorios programados en la hora exacta",
           importance: Importance.high,
           priority: Priority.high,
+          playSound: true,
         ),
       ),
       payload: "due|$reminderId|$code",

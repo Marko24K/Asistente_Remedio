@@ -17,7 +17,7 @@ class ReminderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = reminder;
 
-    // nextTrigger puede venir como DateTime o como String -> lo normalizo
+    // nextTrigger puede venir como DateTime o como String -
     DateTime? nextTrigger;
     final rawNext = r["nextTrigger"];
     if (rawNext is DateTime) {

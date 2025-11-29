@@ -37,6 +37,13 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
         final next = DBHelper.calculateNextTrigger(hour, freq);
 
         await DBHelper.updateNextTriggerById(widget.reminder["id"], next);
+        await FeedbackScheduler.scheduleDueReminder(
+          reminderId: widget.reminder["id"],
+          code: widget.reminder["patientCode"],
+          medication: widget.reminder["medication"],
+          hour: widget.reminder["hour"],
+          when: next,
+        );
       }
 
       if (mounted) Navigator.pop(context);
@@ -76,6 +83,13 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
                 final next = DBHelper.calculateNextTrigger(hour, freq);
 
                 await DBHelper.updateNextTriggerById(r["id"], next);
+                await FeedbackScheduler.scheduleDueReminder(
+                  reminderId: r["id"],
+                  code: r["patientCode"],
+                  medication: r["medication"],
+                  hour: r["hour"],
+                  when: next,
+                );
 
                 await DBHelper.addPoints(10, r["patientCode"]);
 
