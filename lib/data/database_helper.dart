@@ -112,11 +112,11 @@ class DBHelper {
           "medication": "Paracetamol 500mg",
           "dose": "1 tableta",
           "type": "Pastilla",
-          "hour": "08:00",
+          "hour": "19:00",
           "notes": "Tomar con agua",
           "startDate": "2025-11-21",
           "endDate": "2025-12-24",
-          "frequencyHours": 4,
+          "frequencyHours": 1,
           "nextTrigger": DateTime.now()
               .add(const Duration(hours: 1))
               .toIso8601String(),
@@ -126,9 +126,9 @@ class DBHelper {
           "medication": "Ibuprofeno",
           "dose": "500g",
           "type": "Pastilla",
-          "hour": "16:30",
+          "hour": "19:30",
           "notes": "Tomar con agua",
-          "startDate": "2025-11-21",
+          "startDate": "2025-11-29",
           "endDate": "2025-12-24",
           "frequencyHours": 1,
           "nextTrigger": DateTime.now()
@@ -237,22 +237,49 @@ class DBHelper {
     );
   }
 
-  static DateTime calculateNextTrigger(String hour, int frequencyHours) {
+  static DateTime calculateNextTrigger(
+    String hour,
+    int frequencyHours, {
+    String? startDate,
+  }) {
     final now = DateTime.now();
 
-    // hora base → "08:00"
-    final parts = hour.split(":");
-    int h = int.parse(parts[0]);
-    int m = int.parse(parts[1]);
-
-    DateTime next = DateTime(now.year, now.month, now.day, h, m);
-
-    // si ya pasó -> avanzar al siguiente ciclo
-    if (next.isBefore(now)) {
-      next = next.add(Duration(hours: frequencyHours));
+    // --- PROTECCIÓN: si frecuencia no es válida ---
+    if (frequencyHours <= 0) {
+      frequencyHours = 24; // fallback seguro
     }
 
-    // si aun sigue en el pasado por ciclos → avanzar hasta futuro
+    // --- PARSEAR HORA “HH:MM” ---
+    final parts = hour.split(":");
+    final h = int.parse(parts[0]);
+    final m = int.parse(parts[1]);
+
+    // --- SI HAY startDate, usarla COMO BASE ---
+    DateTime baseDay;
+    if (startDate != null) {
+      final sd = DateTime.tryParse(startDate);
+
+      if (sd != null) {
+        baseDay = DateTime(sd.year, sd.month, sd.day, h, m);
+
+        // si startDate es en el futuro → devolver startDate + hour inmediata
+        if (baseDay.isAfter(now)) {
+          return baseDay;
+        }
+
+        // si startDate es hoy, usamos el cálculo normal de ciclos
+      } else {
+        // si startDate es inválida, usar hoy
+        baseDay = DateTime(now.year, now.month, now.day, h, m);
+      }
+    } else {
+      // si no hay startDate → usar HOY
+      baseDay = DateTime(now.year, now.month, now.day, h, m);
+    }
+
+    DateTime next = baseDay;
+
+    // --- SI YA PASÓ EL HORARIO PROYECTADO DE HOY → ciclo siguiente ---
     while (next.isBefore(now)) {
       next = next.add(Duration(hours: frequencyHours));
     }

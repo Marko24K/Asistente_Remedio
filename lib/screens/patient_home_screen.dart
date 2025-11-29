@@ -1,8 +1,6 @@
-// lib/screens/patient_home_screen.dart
-
+import 'package:asistente_remedio/services/feedback_scheduler.dart';
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-
 import '../data/database_helper.dart';
 import 'reminder_details_screen.dart';
 import 'points_screen.dart';
@@ -28,11 +26,24 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
   Future<void> loadReminders() async {
     final data = await DBHelper.getReminders(widget.patientCode);
+    final now = DateTime.now();
 
     reminders = data.map<Map<String, dynamic>>((r) {
       DateTime? next;
+
       if (r["nextTrigger"] != null) {
         next = DateTime.tryParse(r["nextTrigger"].toString());
+      }
+
+      // PROGRAMAR NOTIFICACIÓN PRINCIPAL SI LA FECHA ES VÁLIDA
+      if (next != null && next.isAfter(now)) {
+        FeedbackScheduler.scheduleDueReminder(
+          reminderId: r["id"],
+          code: r["patientCode"],
+          medication: r["medication"],
+          hour: r["hour"],
+          when: next,
+        );
       }
 
       return {
@@ -42,10 +53,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
         "dose": r["dose"],
         "type": r["type"],
         "hour": r["hour"],
-        "notes": r["notes"] ?? "",
-        "startDate": r["startDate"] ?? "",
-        "endDate": r["endDate"] ?? "",
-        "frequencyHours": r["frequencyHours"] ?? 24,
+        "notes": r["notes"],
+        "startDate": r["startDate"],
+        "endDate": r["endDate"],
+        "frequencyHours": r["frequencyHours"],
         "nextTrigger": next,
       };
     }).toList();

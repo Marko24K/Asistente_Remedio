@@ -23,7 +23,7 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
     // 2 minutos para marcar
     t = Timer(const Duration(minutes: 2), () async {
       if (!marked) {
-        // Programar notificación diferida
+        // Notificación diferida
         await FeedbackScheduler.scheduleDeferredForReminder(
           reminderId: widget.reminder["id"],
           patientCode: widget.reminder["patientCode"],
@@ -37,6 +37,8 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
         final next = DBHelper.calculateNextTrigger(hour, freq);
 
         await DBHelper.updateNextTriggerById(widget.reminder["id"], next);
+
+        // AGENDAR SIGUIENTE TOMADA
         await FeedbackScheduler.scheduleDueReminder(
           reminderId: widget.reminder["id"],
           code: widget.reminder["patientCode"],
@@ -80,9 +82,12 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
 
                 final freq = r["frequencyHours"];
                 final hour = r["hour"];
+
                 final next = DBHelper.calculateNextTrigger(hour, freq);
 
                 await DBHelper.updateNextTriggerById(r["id"], next);
+
+                // AGENDAR SIGUIENTE NOTIFICACIÓN
                 await FeedbackScheduler.scheduleDueReminder(
                   reminderId: r["id"],
                   code: r["patientCode"],

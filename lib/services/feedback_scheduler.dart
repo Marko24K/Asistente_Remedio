@@ -22,64 +22,83 @@ class FeedbackScheduler {
 
     const initSettings = InitializationSettings(android: androidSettings);
 
+    // ----- 1. CREAR CANALES -----
+    final androidPlugin = notifications
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >();
+
+    if (androidPlugin != null) {
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'due_channel',
+          'Recordatorios a la hora exacta',
+          description: 'Recordatorios principales',
+          importance: Importance.max,
+        ),
+      );
+
+      await androidPlugin.createNotificationChannel(
+        const AndroidNotificationChannel(
+          'feedback_channel',
+          'Recordatorios diferidos',
+          description: 'Recordatorios si no se confirma la toma',
+          importance: Importance.high,
+        ),
+      );
+    }
+
+    // ----- 2. inicializar plugin -----
     await notifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse resp) async {
         final payload = resp.payload ?? "";
 
-        // ---- NOTIFICACIÓN DIFERIDA ----
         if (payload.startsWith("missed|")) {
-          final parts = payload.split("|");
-          final reminderId = int.tryParse(parts[1]) ?? 0;
-          final code = parts[2];
+          final p = payload.split("|");
+          final id = int.tryParse(p[1]) ?? 0;
+          final code = p[2];
 
-          final reminder = await DBHelper.getReminderById(reminderId);
+          final reminder = await DBHelper.getReminderById(id);
           if (reminder == null) return;
 
           navigatorKey.currentState?.pushNamed(
             "/confirm_missed",
             arguments: {
               "code": code,
-              "reminderId": reminderId,
+              "reminderId": id,
               "medication": reminder["medication"],
               "scheduledHour": reminder["hour"],
             },
           );
-          return;
         }
 
-        // ---- NOTIFICACIÓN NORMAL ----
         if (payload.startsWith("due|")) {
-          final parts = payload.split("|");
-          final reminderId = int.tryParse(parts[1]) ?? 0;
-          final code = parts[2];
+          final p = payload.split("|");
+          final id = int.tryParse(p[1]) ?? 0;
+          final code = p[2];
 
           navigatorKey.currentState?.pushNamed(
             "/due_reminder",
-            arguments: {"reminderId": reminderId, "code": code},
+            arguments: {"reminderId": id, "code": code},
           );
         }
       },
     );
 
-    // ----- Permisos Android -----
+    // ----- 3. Permisos Android -----
     if (Platform.isAndroid) {
-      final androidPlugin = notifications
-          .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
-
       await androidPlugin?.requestNotificationsPermission();
       await androidPlugin?.requestExactAlarmsPermission();
     }
 
-    // ----- Timezone -----
+    // ----- 4. Timezone -----
     tzdata.initializeTimeZones();
     tz.setLocalLocation(tz.getLocation("America/Santiago"));
   }
 
   // ======================================================
-  // NOTIFICACIÓN DIFERIDA
+  // DIFERIDA
   // ======================================================
   static Future<void> scheduleDeferredForReminder({
     required int reminderId,
@@ -88,7 +107,6 @@ class FeedbackScheduler {
     required String scheduledHour,
   }) async {
     final random = Random();
-
     final future = DateTime.now().add(
       Duration(minutes: 20 + random.nextInt(40)),
     );
@@ -98,17 +116,15 @@ class FeedbackScheduler {
     await notifications.zonedSchedule(
       4000 + reminderId,
       "¿Lo tomaste?",
-      "Olvidaste marcar el $medication a las $scheduledHour, ¿lo tomaste?",
+      "Olvidaste marcar el $medication a las $scheduledHour",
       tzDate,
       const NotificationDetails(
         android: AndroidNotificationDetails(
           "feedback_channel",
           "Recordatorios diferidos",
-          channelDescription:
-              "Notificaciones cuando el usuario no confirma la toma",
+          channelDescription: "Si no confirmas la toma",
           importance: Importance.high,
           priority: Priority.high,
-          playSound: true,
         ),
       ),
       payload: "missed|$reminderId|$patientCode",
@@ -118,7 +134,7 @@ class FeedbackScheduler {
   }
 
   // ======================================================
-  // NOTIFICACIÓN DE HORA EXACTA
+  // DUE (HORA EXACTA)
   // ======================================================
   static Future<void> scheduleDueReminder({
     required int reminderId,
@@ -138,10 +154,9 @@ class FeedbackScheduler {
         android: AndroidNotificationDetails(
           "due_channel",
           "Recordatorios a la hora exacta",
-          channelDescription: "Recordatorios programados en la hora exacta",
-          importance: Importance.high,
+          channelDescription: "Recordatorios principales",
+          importance: Importance.max,
           priority: Priority.high,
-          playSound: true,
         ),
       ),
       payload: "due|$reminderId|$code",
