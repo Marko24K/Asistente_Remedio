@@ -1,189 +1,261 @@
 import 'package:flutter/material.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../data/database_helper.dart';
 
 class ReminderDetailScreen extends StatelessWidget {
-  final String name;
-  final String dose;
-  final String type;
-  final String hour;
-  final String note;
+  final Map<String, dynamic> reminder;
 
-  const ReminderDetailScreen({
-    super.key,
-    required this.name,
-    required this.dose,
-    required this.type,
-    required this.hour,
-    required this.note,
-  });
+  const ReminderDetailScreen({super.key, required this.reminder});
 
-  IconData _getIcon() {
-    final t = type.toLowerCase();
-    if (t.contains("inye")) return FontAwesomeIcons.syringe;
-    if (t.contains("líq") || t.contains("jarabe") || t.contains("liq")) {
-      return FontAwesomeIcons.prescriptionBottle;
-    }
-    if (t.contains("caps")) return FontAwesomeIcons.capsules;
-    if (t.contains("got")) return FontAwesomeIcons.eyeDropper;
-    if (t.contains("past") || t.contains("tabl")) {
-      return FontAwesomeIcons.pills;
-    }
-    return FontAwesomeIcons.pills;
+  String _formatHour(DateTime? dt, String fallback) {
+    if (dt == null) return fallback;
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return "$h:$m";
   }
 
   @override
   Widget build(BuildContext context) {
+    final r = reminder;
+
+    // nextTrigger puede venir como DateTime o como String -> lo normalizo
+    DateTime? nextTrigger;
+    final rawNext = r["nextTrigger"];
+    if (rawNext is DateTime) {
+      nextTrigger = rawNext;
+    } else if (rawNext is String) {
+      nextTrigger = DateTime.tryParse(rawNext);
+    }
+
+    final horaProgramada = (r["hour"] ?? "--:--") as String;
+    final proximaToma = _formatHour(nextTrigger, horaProgramada);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F4),
+      backgroundColor: const Color(0xFFF4F7F6),
       appBar: AppBar(
+        title: const Text("Detalles"),
         backgroundColor: Colors.white,
+        foregroundColor: Colors.black87,
         elevation: 0,
-        title: const Text(
-          "Detalle del recordatorio",
-          style: TextStyle(color: Colors.black87),
-        ),
-        iconTheme: const IconThemeData(color: Colors.black87),
-        centerTitle: true,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(18.0),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.05),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          children: [
+            // ---------- TARJETA PRINCIPAL ----------
+            Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(18),
               ),
-            ],
-          ),
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Icono + nombre
-              Container(
-                width: 90,
-                height: 90,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Título + icono
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.medication_rounded,
+                        color: Colors.green,
+                        size: 28,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          r["medication"] ?? "",
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 6),
+                  Text(
+                    "${r['dose'] ?? ''} • ${r['type'] ?? ''}",
+                    style: const TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Hora programada (la original del tratamiento)
+                  _item("Hora programada", horaProgramada),
+                  _divider(),
+
+                  // Próxima toma (usa nextTrigger)
+                  _item("Próxima toma", proximaToma),
+                  _divider(),
+
+                  _item("Inicio del recordatorio", r["startDate"] ?? ""),
+                  _divider(),
+                  _item("Fin del recordatorio", r["endDate"] ?? ""),
+                  _divider(),
+
+                  // Notas + botón "Ver más"
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        "Notas",
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => _showNotes(context, r["notes"] ?? ""),
+                        child: const Text("Ver más"),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 35),
+
+            // ---------- BOTÓN TOMAR ANTES ----------
+            GestureDetector(
+              onTap: () async {
+                final freq = (r["frequencyHours"] ?? 24) as int;
+
+                // La toma real es AHORA
+                final now = DateTime.now();
+                final next = now.add(Duration(hours: freq));
+
+                await DBHelper.updateNextTriggerById(r["id"], next);
+
+                // Avisar al home que hubo cambios → recarga lista
+                if (context.mounted) {
+                  Navigator.pop(context, true);
+                }
+              },
+              child: Container(
+                width: 220,
+                height: 220,
                 decoration: const BoxDecoration(
-                  color: Color(0xFFE4F3E9),
+                  color: Color(0xFF2E8B57),
                   shape: BoxShape.circle,
                 ),
-                child: Center(
-                  child: FaIcon(_getIcon(), size: 36, color: Colors.black87),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                name,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-
-              const SizedBox(height: 22),
-
-              // Secciones grandes y separadas
-              _sectionBlock(
-                title: "Dosis",
-                value: dose.isEmpty ? "-" : dose,
-                icon: Icons.medication,
-              ),
-              _sectionBlock(
-                title: "Tipo",
-                value: type.isEmpty ? "-" : type,
-                icon: Icons.category,
-              ),
-              _sectionBlock(
-                title: "Próxima toma",
-                value: hour,
-                icon: Icons.schedule,
-              ),
-              _sectionBlock(
-                title: "Notas",
-                value: note.isEmpty ? "Sin notas" : note,
-                icon: Icons.notes,
-                multiline: true,
-              ),
-
-              const Spacer(),
-
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF40916C),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text(
-                    "Volver",
-                    style: TextStyle(fontSize: 18, color: Colors.white),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.check, color: Colors.white, size: 75),
+                      SizedBox(height: 10),
+                      Text(
+                        "Tomar antes",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _sectionBlock({
-    required String title,
-    required String value,
-    required IconData icon,
-    bool multiline = false,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF7F9F8),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade300),
-      ),
+  Widget _item(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
-        crossAxisAlignment: multiline
-            ? CrossAxisAlignment.start
-            : CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(icon, size: 26, color: const Color(0xFF2D6A4F)),
-          const SizedBox(width: 10),
-          Expanded(
+          Text(
+            label,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+          ),
+          Text(
+            value,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _divider() {
+    return Container(
+      height: 1,
+      color: Colors.grey.shade300,
+      margin: const EdgeInsets.symmetric(vertical: 6),
+    );
+  }
+
+  void _showNotes(BuildContext context, String text) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(18),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black87,
-                  ),
+                // Título + cerrar
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Nota",
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    color: Colors.black87,
-                    height: 1.3,
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF2D6A4F)),
+                    color: const Color(0xFFF7F9F8),
+                  ),
+                  child: Text(text, style: const TextStyle(fontSize: 15)),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2D6A4F),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    child: const Text(
+                      "Entendido",
+                      style: TextStyle(fontSize: 18, color: Colors.white),
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

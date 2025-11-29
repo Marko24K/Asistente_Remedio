@@ -1,6 +1,8 @@
-import 'package:asistente_remedio/services/feedback_scheduler.dart';
+// lib/screens/patient_home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
 import '../data/database_helper.dart';
 import 'reminder_details_screen.dart';
 import 'points_screen.dart';
@@ -27,246 +29,234 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   Future<void> loadReminders() async {
     final data = await DBHelper.getReminders(widget.patientCode);
 
-    reminders = data.map((r) {
-      final nextTrigger = r['nextTrigger'] != null
-          ? DateTime.tryParse(r['nextTrigger'].toString())
-          : null;
+    reminders = data.map<Map<String, dynamic>>((r) {
+      DateTime? next;
+      if (r["nextTrigger"] != null) {
+        next = DateTime.tryParse(r["nextTrigger"].toString());
+      }
 
       return {
-        'name': r['medication'] ?? "Medicamento",
-        'dose': r['dose'] ?? '',
-        'type': r['type'] ?? '',
-        'hour': r['hour'] ?? '--:--',
-        'notes': r['notes'] ?? '',
-        'nextTrigger': nextTrigger,
+        "id": r["id"],
+        "patientCode": r["patientCode"],
+        "medication": r["medication"],
+        "dose": r["dose"],
+        "type": r["type"],
+        "hour": r["hour"],
+        "notes": r["notes"] ?? "",
+        "startDate": r["startDate"] ?? "",
+        "endDate": r["endDate"] ?? "",
+        "frequencyHours": r["frequencyHours"] ?? 24,
+        "nextTrigger": next,
       };
     }).toList();
-
-    // ordenar por próxima toma
-    reminders.sort((a, b) {
-      final ta = a['nextTrigger'] as DateTime?;
-      final tb = b['nextTrigger'] as DateTime?;
-      if (ta == null && tb == null) return 0;
-      if (ta == null) return 1;
-      if (tb == null) return -1;
-      return ta.compareTo(tb);
-    });
 
     setState(() => loading = false);
   }
 
-  IconData _getIcon(String? type) {
-    final t = (type ?? "").toLowerCase();
-
-    if (t.contains("inyeccion")) return FontAwesomeIcons.syringe;
-    if (t.contains("líquido") || t.contains("jarabe")) {
-      return FontAwesomeIcons.prescriptionBottle;
-    }
-    if (t.contains("capsulas")) return FontAwesomeIcons.capsules;
-    if (t.contains("gotas")) return FontAwesomeIcons.eyeDropper;
-    if (t.contains("pastillas") || t.contains("tabletas")) {
-      return FontAwesomeIcons.pills;
-    }
-
-    return FontAwesomeIcons.pills;
+  String _formatHour(DateTime? dt, String fallback) {
+    if (dt == null) return fallback;
+    final h = dt.hour.toString().padLeft(2, '0');
+    final m = dt.minute.toString().padLeft(2, '0');
+    return "$h:$m";
   }
 
-  String _formatHour(DateTime? t, String fallback) {
-    if (t == null) return fallback;
-    return "${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}";
+  IconData _getIcon(String type) {
+    final t = type.toLowerCase();
+    if (t.contains("inyec")) return FontAwesomeIcons.syringe;
+    if (t.contains("líq") || t.contains("jarabe")) {
+      return FontAwesomeIcons.prescriptionBottle;
+    }
+    if (t.contains("caps")) return FontAwesomeIcons.capsules;
+    return FontAwesomeIcons.pills;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F4),
-
+      backgroundColor: const Color(0xFFF4F7F6),
       bottomNavigationBar: _bottomNav(),
-
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-
-            // Título centrado
-            Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 22,
-                  vertical: 10,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE4F3E9),
-                  borderRadius: BorderRadius.circular(40),
-                ),
-                child: const Text(
-                  "AsistenteRemedios",
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1B4332),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Column(
+            children: [
+              // Header centrado
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.circle, color: Colors.green, size: 12),
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE6F4EA),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: const Text(
+                      "AsistenteRemedios",
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1B4332),
+                      ),
+                    ),
                   ),
+                ],
+              ),
+
+              const SizedBox(height: 16),
+
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.grey.shade300),
+                  ),
+                  padding: const EdgeInsets.all(14),
+                  child: loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Text(
+                                  "Todos los recordatorios",
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                const Spacer(),
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: Colors.green.shade100,
+                                  child: Text(
+                                    reminders.length.toString(),
+                                    style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+
+                            Expanded(
+                              child: reminders.isEmpty
+                                  ? const Center(
+                                      child: Text(
+                                        "Sin recordatorios por ahora",
+                                        style: TextStyle(
+                                          fontSize: 17,
+                                          color: Colors.black54,
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.builder(
+                                      itemCount: reminders.length,
+                                      itemBuilder: (_, i) =>
+                                          _buildReminderTile(reminders[i]),
+                                    ),
+                            ),
+                          ],
+                        ),
                 ),
               ),
-            ),
-
-            const SizedBox(height: 16),
-
-            Expanded(
-              child: Container(
-                width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-                ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 18,
-                ),
-                child: loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : reminders.isEmpty
-                    ? _emptyState()
-                    : _remindersList(),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ---------- Lista de recordatorios ----------
-  Widget _remindersList() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            const Text(
-              "Todos los recordatorios",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
-            ),
-            const Spacer(),
-            CircleAvatar(
-              radius: 14,
-              backgroundColor: Colors.green.shade100,
-              child: Text(
-                reminders.length.toString(),
-                style: TextStyle(
-                  color: Colors.green.shade800,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        ElevatedButton(
-          onPressed: () {
-            FeedbackScheduler.sendTestNotification(widget.patientCode);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade700,
-            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-          child: const Text(
-            "Probar notificación",
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
+  Widget _buildReminderTile(Map<String, dynamic> r) {
+    final DateTime? next = r["nextTrigger"];
+    final now = DateTime.now();
+    final isLate = next != null && next.isBefore(now);
 
-        Expanded(
-          child: ListView.builder(
-            itemCount: reminders.length,
-            itemBuilder: (_, i) => _reminderCard(reminders[i]),
-          ),
+    final nextHour = _formatHour(next, r["hour"] ?? "--:--");
+
+    return GestureDetector(
+      onTap: () async {
+        final changed = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => ReminderDetailScreen(reminder: r)),
+        );
+
+        if (changed == true) {
+          setState(() => loading = true);
+          await loadReminders();
+        }
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6F4EA),
+          borderRadius: BorderRadius.circular(12),
         ),
-      ],
-    );
-  }
-
-  Widget _reminderCard(Map<String, dynamic> r) {
-    final next = r['nextTrigger'] as DateTime?;
-    final nextFormatted = _formatHour(next, r['hour']);
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F7F3),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ReminderDetailScreen(
-                name: r['name'],
-                dose: r['dose'],
-                type: r['type'],
-                hour: nextFormatted,
-                note: r['notes'],
-              ),
-            ),
-          );
-        },
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // icono
-            Container(
-              width: 52,
-              height: 52,
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: FaIcon(
-                  _getIcon(r['type']),
-                  size: 22,
-                  color: Colors.black87,
-                ),
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: Colors.white,
+              child: FaIcon(
+                _getIcon(r["type"] ?? ""),
+                size: 20,
+                color: Colors.black87,
               ),
             ),
             const SizedBox(width: 14),
-
-            // texto
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    r['name'],
+                    r["medication"] ?? "Medicamento",
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 17,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    "Dosis: ${r['dose']}  •  Tipo: ${r['type']}",
-                    style: const TextStyle(fontSize: 15, color: Colors.black87),
+                    "Dosis: ${r["dose"] ?? ""} • Tipo: ${r["type"] ?? ""}",
+                    style: const TextStyle(fontSize: 14, color: Colors.black87),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    "Próxima: $nextFormatted",
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.green.shade800,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  const SizedBox(height: 6),
+                  isLate
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFE57373),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            "No marcada $nextHour",
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 13,
+                            ),
+                          ),
+                        )
+                      : Text(
+                          "Próxima: $nextHour",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green.shade800,
+                          ),
+                        ),
                 ],
               ),
             ),
@@ -276,16 +266,6 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     );
   }
 
-  Widget _emptyState() {
-    return const Center(
-      child: Text(
-        "No tienes recordatorios aún",
-        style: TextStyle(fontSize: 18, color: Colors.black54),
-      ),
-    );
-  }
-
-  // ---------- NAV INFERIOR ----------
   Widget _bottomNav() {
     return Container(
       height: 72,
@@ -295,18 +275,18 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       ),
       child: Row(
         children: [
-          _navButton(
+          _navItem(
             icon: FontAwesomeIcons.pills,
             label: "Remedios",
             active: true,
             onTap: () {},
           ),
-          _navButton(
+          _navItem(
             icon: FontAwesomeIcons.star,
             label: "Puntos",
             active: false,
             onTap: () {
-              Navigator.pushReplacement(
+              Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => PointsScreen(code: widget.patientCode),
@@ -319,7 +299,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     );
   }
 
-  Widget _navButton({
+  Widget _navItem({
     required IconData icon,
     required String label,
     required bool active,

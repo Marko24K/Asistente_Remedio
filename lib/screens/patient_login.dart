@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 import '../data/database_helper.dart';
 import 'patient_home_screen.dart';
 
@@ -10,122 +12,94 @@ class PatientLoginScreen extends StatefulWidget {
 }
 
 class _PatientLoginScreenState extends State<PatientLoginScreen> {
-  final TextEditingController _codeController = TextEditingController();
-  bool _loading = false;
-  String? _errorMessage;
+  final TextEditingController _code = TextEditingController();
+  bool loading = false;
+  String? error;
 
-  Future<void> _submitCode() async {
+  Future<void> _login() async {
     setState(() {
-      _loading = true;
-      _errorMessage = null;
+      loading = true;
+      error = null;
     });
 
-    final code = _codeController.text.trim();
+    final code = _code.text.trim().toUpperCase();
 
-    if (code.isEmpty || code.length < 4) {
+    if (code.isEmpty) {
       setState(() {
-        _errorMessage = "Ingrese un código válido";
-        _loading = false;
+        error = "Ingrese un código válido";
+        loading = false;
       });
       return;
     }
 
-    final patient = await DBHelper.getPatient(code);
+    // ✅ Validación offline usando SQLite
+    final paciente = await DBHelper.getPatient(code);
+
+    if (paciente == null) {
+      setState(() {
+        error = "Código no encontrado";
+        loading = false;
+      });
+      return;
+    }
+
+    // ✅ Guardar login persistente
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("patientCode", code);
 
     if (!mounted) return;
 
-    if (patient != null) {
-      // Si existe → navegar a Home
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => PatientHomeScreen(patientCode: code)),
-      );
-    } else {
-      // No existe en BD
-      setState(() {
-        _errorMessage = "Código no encontrado";
-        _loading = false;
-      });
-    }
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => PatientHomeScreen(patientCode: code)),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F4),
-      appBar: AppBar(
-        title: const Text("Ingresar código"),
-        backgroundColor: Colors.white,
-        elevation: 0,
-        centerTitle: true,
-        foregroundColor: Colors.black87,
-      ),
-
+      appBar: AppBar(title: const Text("Ingresar código")),
       body: Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const SizedBox(height: 10),
-
+            const SizedBox(height: 20),
             const Text(
               "Ingresa el código asignado por tu cuidador",
               textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 20,
-                color: Colors.black87,
-                height: 1.4,
-              ),
+              style: TextStyle(fontSize: 18),
             ),
-
-            const SizedBox(height: 35),
+            const SizedBox(height: 30),
 
             TextField(
-              controller: _codeController,
+              controller: _code,
               textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 24, letterSpacing: 3),
               decoration: InputDecoration(
-                hintText: "Ejemplo: A92KD7",
-                errorText: _errorMessage,
-                hintStyle: const TextStyle(fontSize: 20, color: Colors.black38),
+                errorText: error,
+                hintText: "A92KD7",
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 12,
-                  horizontal: 10,
-                ),
-              ),
-              style: const TextStyle(
-                fontSize: 26,
-                letterSpacing: 3,
-                fontWeight: FontWeight.w600,
               ),
               maxLength: 8,
             ),
 
             const SizedBox(height: 20),
 
-            _loading
+            loading
                 ? const CircularProgressIndicator()
-                : SizedBox(
-                    width: double.infinity,
-                    height: 60,
-                    child: ElevatedButton(
-                      onPressed: _submitCode,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF40916C),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+                : ElevatedButton(
+                    onPressed: _login,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 40,
+                        vertical: 14,
                       ),
-                      child: const Text(
-                        "INGRESAR",
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 1,
-                        ),
-                      ),
+                    ),
+                    child: const Text(
+                      "INGRESAR",
+                      style: TextStyle(fontSize: 20),
                     ),
                   ),
           ],

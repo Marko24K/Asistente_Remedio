@@ -10,7 +10,7 @@ class FirestoreService {
     return _db.collection("patients").doc(code).get();
   }
 
-  /// 🔥 Obtener lista de recordatorios del paciente
+  ///  Obtener lista de recordatorios del paciente
   Future<List<Map<String, dynamic>>> getReminders(String code) async {
     final snap = await _db
         .collection("patients")

@@ -1,3 +1,4 @@
+
 import 'dart:math';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -8,6 +9,9 @@ class FeedbackScheduler {
   static final FlutterLocalNotificationsPlugin notifications =
       FlutterLocalNotificationsPlugin();
 
+  // ===============================================
+  // INIT
+  // ===============================================
   static Future<void> init() async {
     const androidSettings = AndroidInitializationSettings(
       '@mipmap/ic_launcher',
@@ -17,123 +21,110 @@ class FeedbackScheduler {
 
     await notifications.initialize(
       initSettings,
-      onDidReceiveNotificationResponse: (resp) {
-        final code = resp.payload;
-        if (code != null) {
-          navigatorKey.currentState?.pushNamed("/confirm", arguments: code);
+      onDidReceiveNotificationResponse: (resp) async {
+        final payload = resp.payload ?? "";
+
+        // ---- DIFERIDA ----
+        if (payload.startsWith("missed|")) {
+          final parts = payload.split("|");
+          final reminderId = int.tryParse(parts[1]) ?? 0;
+          final code = parts[2];
+
+          final reminder = await DBHelper.getReminderById(reminderId);
+          if (reminder == null) return;
+
+          navigatorKey.currentState?.pushNamed(
+            "/confirm_missed",
+            arguments: {
+              "code": code,
+              "reminderId": reminderId,
+              "medication": reminder["medication"],
+              "scheduledHour": reminder["hour"],
+            },
+          );
+          return;
+        }
+
+        // ---- RECORDATORIO NORMAL ----
+        if (payload.startsWith("due|")) {
+          final parts = payload.split("|");
+          final reminderId = int.tryParse(parts[1]) ?? 0;
+          final code = parts[2];
+
+          navigatorKey.currentState?.pushNamed(
+            "/due_reminder",
+            arguments: {"reminderId": reminderId, "code": code},
+          );
         }
       },
     );
   }
 
-  /// Notificación inmediata para prueba manual
-  static Future<void> sendTestNotification(String code) async {
-    await notifications.show(
-      1001,
-      "Recordatorio de prueba",
-      "¿Cómo vas con tus medicamentos hoy?",
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          "test_channel",
-          "Pruebas",
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      ),
-      payload: code,
-    );
-  }
-
-  /// Programar feedback semanal 1–3 días en el futuro (ya lo tenías)
-  static Future<void> scheduleWeeklyFeedback(String code) async {
-    final reminders = await DBHelper.getReminders(code);
-    if (reminders.isEmpty) return;
-
+  // ===============================================
+  // NOTIFICACIÓN DIFERIDA
+  // ===============================================
+  static Future<void> scheduleDeferredForReminder({
+    required int reminderId,
+    required String patientCode,
+    required String medication,
+    required String scheduledHour,
+  }) async {
     final random = Random();
-    final now = DateTime.now();
 
-    final target = DateTime(
-      now.year,
-      now.month,
-      now.day + (random.nextInt(3) + 1),
-      10,
-      0,
+    // Notificación entre 20 y 60 minutos después
+    final future = DateTime.now().add(
+      Duration(minutes: 20 + random.nextInt(40)),
     );
 
-    final tzTime = tz.TZDateTime.from(target, tz.local);
+    final tzDate = tz.TZDateTime.from(future, tz.local);
 
     await notifications.zonedSchedule(
-      2025,
-      "Recordatorio semanal 💚",
-      "¿Cómo vas con tus medicamentos?",
-      tzTime,
+      4000 + reminderId,
+      "¿Lo tomaste?",
+      "Olvidaste marcar el $medication a las $scheduledHour, ¿lo tomaste?",
+      tzDate,
       const NotificationDetails(
         android: AndroidNotificationDetails(
           "feedback_channel",
-          "Recordatorios",
+          "Recordatorios diferidos",
           importance: Importance.high,
           priority: Priority.high,
         ),
       ),
+      payload: "missed|$reminderId|$patientCode",
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: null,
-      payload: code,
     );
   }
 
-  /// 🔔 Programar 2 notificaciones de FEEDBACK para HOY
-  /// Una a las 10:30 y otra a las 10:40 (ajusta si la hora ya pasó)
-  static Future<void> scheduleTodayFeedbackTest(String code) async {
-    final now = DateTime.now();
-
-    DateTime t1 = DateTime(now.year, now.month, now.day, 10, 30);
-    DateTime t2 = DateTime(now.year, now.month, now.day, 10, 40);
-
-    // Si ya pasó 10:30, las movemos para unos minutos adelante para poder probar
-    if (t1.isBefore(now)) {
-      t1 = now.add(const Duration(minutes: 1));
-    }
-    if (t2.isBefore(t1)) {
-      t2 = t1.add(const Duration(minutes: 10));
-    }
-
-    final tz1 = tz.TZDateTime.from(t1, tz.local);
-    final tz2 = tz.TZDateTime.from(t2, tz.local);
+  // ===============================================
+  // NOTIFICACIÓN DE HORA EXACTA
+  // ===============================================
+  static Future<void> scheduleDueReminder({
+    required int reminderId,
+    required String code,
+    required String medication,
+    required String hour,
+    required DateTime when,
+  }) async {
+    final tzDate = tz.TZDateTime.from(when, tz.local);
 
     await notifications.zonedSchedule(
-      3001,
-      "¿Cómo vas con tus medicamentos?",
-      "Cuéntanos cómo te ha ido hoy 💚",
-      tz1,
+      2000 + reminderId,
+      "Es hora de tu medicamento",
+      "Toca para marcar tu $medication",
+      tzDate,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          "feedback_channel",
-          "Recordatorios",
+          "due_channel",
+          "Recordatorios de hora exacta",
           importance: Importance.high,
           priority: Priority.high,
         ),
       ),
+      payload: "due|$reminderId|$code",
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       matchDateTimeComponents: null,
-      payload: code,
-    );
-
-    await notifications.zonedSchedule(
-      3002,
-      "Seguimiento de tus medicamentos",
-      "¿Has seguido tomando tus medicamentos?",
-      tz2,
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          "feedback_channel",
-          "Recordatorios",
-          importance: Importance.high,
-          priority: Priority.high,
-        ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      matchDateTimeComponents: null,
-      payload: code,
     );
   }
 }

@@ -1,64 +1,142 @@
-import 'package:sqflite/sqflite.dart';
+// lib/data/database_helper.dart
+import 'dart:async';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 class DBHelper {
   static Database? _db;
 
-  // -------------------- INIT --------------------
+  // =========================================================
+  //  INIT DB
+  // =========================================================
   static Future<void> initDB() async {
-    if (_db != null) return;
-
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, 'asistente_remedios.db');
+    final path = join(await getDatabasesPath(), "asistente_remedios.db");
 
     _db = await openDatabase(
       path,
-      version: 2, // aumenta versión si cambias estructura
-      onCreate: (db, _) async {
-        await _createTables(db);
-      },
-      onUpgrade: (db, oldV, newV) async {
-        await _createTables(db);
+      version: 2,
+      onCreate: (db, version) async {
+        // ---------------- PACIENTES ----------------
+        await db.execute("""
+          CREATE TABLE pacientes (
+            code TEXT PRIMARY KEY,
+            nombre TEXT,
+            rut TEXT,
+            fecha_nacimiento TEXT,
+            telefono TEXT,
+            direccion TEXT,
+            points INTEGER DEFAULT 0,
+            nivel INTEGER DEFAULT 1
+          );
+        """);
+
+        // ---------------- REDES DE APOYO ----------------
+        await db.execute("""
+          CREATE TABLE redes_apoyo (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patientCode TEXT,
+            nombre TEXT NOT NULL,
+            correo TEXT,
+            telefono TEXT,
+            parentesco TEXT,
+            FOREIGN KEY(patientCode) REFERENCES pacientes(code)
+          );
+        """);
+
+        // ---------------- MEDICAMENTOS CATÁLOGO ---------
+        await db.execute("""
+          CREATE TABLE medicamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT NOT NULL
+          );
+        """);
+
+        // ---------------- RECORDATORIOS -----------------
+        await db.execute("""
+          CREATE TABLE reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patientCode TEXT,
+            medication TEXT,
+            dose TEXT,
+            type TEXT,
+            hour TEXT,
+            notes TEXT,
+            startDate TEXT,
+            endDate TEXT,
+            frequencyHours INTEGER,
+            nextTrigger TEXT,
+            FOREIGN KEY(patientCode) REFERENCES pacientes(code)
+          );
+        """);
+
+        // Tabla KPIs (tomado si/no)
+        await db.execute("""
+          CREATE TABLE kpis_tomas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            reminderId INTEGER,
+            patientCode TEXT,
+            fecha TEXT,
+            horaProgramada TEXT,
+            respondio TEXT, -- "si" o "no"
+            puntosOtorgados INTEGER,
+            FOREIGN KEY(reminderId) REFERENCES reminders(id)
+          );
+        """);
+
+        // ------------- LOGROS & NIVELES (FUTURO) ---------
+        await db.execute("""
+          CREATE TABLE logros (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            patientCode TEXT,
+            nombre TEXT,
+            descripcion TEXT,
+            obtenido INTEGER DEFAULT 0
+          );
+        """);
+
+        // ----------- Inserción manual de prueba -------
+        await db.insert("pacientes", {
+          "code": "A92KD7",
+          "nombre": "Juan Pérez",
+          "rut": "12.345.678-9",
+          "fecha_nacimiento": "1949-04-18",
+          "telefono": "+56912345678",
+          "direccion": "Calle Falsa 123",
+          "points": 0,
+          "nivel": 1,
+        });
+
+        // recordatorio ejemplo
+        await db.insert("reminders", {
+          "patientCode": "A92KD7",
+          "medication": "Paracetamol 500mg",
+          "dose": "1 tableta",
+          "type": "Pastilla",
+          "hour": "08:00",
+          "notes": "Tomar con agua",
+          "startDate": "2025-11-21",
+          "endDate": "2025-12-24",
+          "frequencyHours": 4,
+          "nextTrigger": DateTime.now()
+              .add(const Duration(hours: 1))
+              .toIso8601String(),
+        });
+        await db.insert("reminders", {
+          "patientCode": "A92KD7",
+          "medication": "Ibuprofeno",
+          "dose": "500g",
+          "type": "Pastilla",
+          "hour": "08:00",
+          "notes": "Tomar con agua",
+          "startDate": "2025-11-21",
+          "endDate": "2025-12-24",
+          "frequencyHours": 2,
+          "nextTrigger": DateTime.now()
+              .add(const Duration(hours: 1))
+              .toIso8601String(),
+        });
       },
     );
-  }
-
-  static Future<void> _createTables(Database db) async {
-    // Pacientes
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS patients (
-        code TEXT PRIMARY KEY,
-        name TEXT,
-        points INTEGER,
-        totalPoints INTEGER
-      );
-    ''');
-
-    // Medicamentos (solo nombre)
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS medicamentos (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nombre TEXT
-      );
-    ''');
-
-    // Recordatorios
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS reminders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        patientCode TEXT,
-        medId INTEGER,
-        dose TEXT,
-        type TEXT,
-        hour TEXT,
-        notes TEXT,
-        duration INTEGER,
-        frequencyHours INTEGER,
-        startDate TEXT,
-        endDate TEXT,
-        nextTrigger TEXT
-      );
-    ''');
   }
 
   static Future<Database> get database async {
@@ -67,98 +145,191 @@ class DBHelper {
     return _db!;
   }
 
-  // -------------------- PACIENTES --------------------
-  static Future<void> insertOrUpdatePatientLocal(
-    Map<String, dynamic> data,
-  ) async {
-    final db = await database;
-    await db.insert(
-      "patients",
-      data,
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
-  }
-
+  // =========================================================
+  //  PACIENTES
+  // =========================================================
   static Future<Map<String, dynamic>?> getPatient(String code) async {
     final db = await database;
     final res = await db.query(
-      "patients",
+      "pacientes",
       where: "code = ?",
       whereArgs: [code],
     );
-    return res.isNotEmpty ? res.first : null;
+
+    if (res.isEmpty) return null;
+    return res.first;
   }
 
-  static Future<int> getPoints(String code) async {
-    final p = await getPatient(code);
-    return p?["points"] ?? 0;
-  }
-
-  static Future<void> addPoints(int value, String code) async {
+  static Future<int> updatePatient(
+    Map<String, dynamic> data,
+    String code,
+  ) async {
     final db = await database;
-    final p = await getPatient(code);
-    int current = p?["points"] ?? 0;
-    int total = p?["totalPoints"] ?? 0;
-
-    int updated = current + value;
-    if (updated < 0) updated = 0;
-
-    if (value > 0) {
-      total += value; // solo sumamos al total cuando gana puntos
-    }
-
-    await db.update(
-      "patients",
-      {"points": updated, "totalPoints": total},
-      where: "code = ?",
-      whereArgs: [code],
-    );
+    return db.update("pacientes", data, where: "code = ?", whereArgs: [code]);
   }
 
-  // -------------------- MEDICAMENTOS --------------------
-  static Future<String?> getMedicamentoNombre(int id) async {
+  // =========================================================
+  //  REDES DE APOYO
+  // =========================================================
+  static Future<void> addSupportNetwork(
+    String patientCode,
+    String nombre,
+    String correo,
+    String telefono,
+    String parentesco,
+  ) async {
     final db = await database;
-    final res = await db.query(
-      "medicamentos",
-      where: "id = ?",
-      whereArgs: [id],
-    );
-    return res.isNotEmpty ? res.first["nombre"] as String : null;
+    await db.insert("redes_apoyo", {
+      "patientCode": patientCode,
+      "nombre": nombre,
+      "correo": correo,
+      "telefono": telefono,
+      "parentesco": parentesco,
+    });
   }
 
-  // Insert masivo cuando cargues el JSON
-  static Future<void> insertMedicamento(String nombre) async {
+  static Future<List<Map<String, dynamic>>> getSupportNetwork(
+    String code,
+  ) async {
     final db = await database;
-    await db.insert("medicamentos", {"nombre": nombre});
+    return db.query("redes_apoyo", where: "patientCode = ?", whereArgs: [code]);
   }
 
-  // -------------------- RECORDATORIOS --------------------
-  static Future<void> insertReminder(Map<String, dynamic> data) async {
+  // =========================================================
+  //  MEDICAMENTOS
+  // =========================================================
+  static Future<int> insertMedicamento(String nombre) async {
     final db = await database;
-    await db.insert("reminders", data);
+    return db.insert("medicamentos", {"nombre": nombre});
+  }
+
+  // =========================================================
+  //  REMINDERS
+  // =========================================================
+  static Future<int> insertReminder(Map<String, dynamic> data) async {
+    final db = await database;
+    return db.insert("reminders", data);
+  }
+
+  // =====================
+  // Obtener reminder por ID
+  // =====================
+  static Future<Map<String, dynamic>?> getReminderById(int id) async {
+    final db = await database;
+    final res = await db.query("reminders", where: "id = ?", whereArgs: [id]);
+    if (res.isEmpty) return null;
+    return res.first;
   }
 
   static Future<List<Map<String, dynamic>>> getReminders(String code) async {
     final db = await database;
+    return db.query("reminders", where: "patientCode = ?", whereArgs: [code]);
+  }
 
-    final res = await db.query(
+  //horas
+  static Future<void> updateReminderNextTrigger(int id, String newDate) async {
+    final db = await database;
+    await db.update(
       "reminders",
-      where: "patientCode = ?",
-      whereArgs: [code],
-      orderBy: "hour ASC",
+      {"nextTrigger": newDate},
+      where: "id = ?",
+      whereArgs: [id],
     );
+  }
 
-    // Resolver nombre del medicamento por medId
-    List<Map<String, dynamic>> finalList = [];
+  static DateTime calculateNextTrigger(String hour, int frequencyHours) {
+    final now = DateTime.now();
 
-    for (var r in res) {
-      int? medId = r["medId"] as int?;
+    // hora base → "08:00"
+    final parts = hour.split(":");
+    int h = int.parse(parts[0]);
+    int m = int.parse(parts[1]);
 
-      String? nombre = medId != null ? await getMedicamentoNombre(medId) : null;
+    DateTime next = DateTime(now.year, now.month, now.day, h, m);
 
-      finalList.add({...r, "medication": nombre ?? "Medicamento"});
+    // si ya pasó -> avanzar al siguiente ciclo
+    if (next.isBefore(now)) {
+      next = next.add(Duration(hours: frequencyHours));
     }
 
-    return finalList;
+    // si aun sigue en el pasado por ciclos → avanzar hasta futuro
+    while (next.isBefore(now)) {
+      next = next.add(Duration(hours: frequencyHours));
+    }
+
+    return next;
+  }
+
+  static Future<void> updateNextTriggerById(int reminderId, DateTime dt) async {
+    final db = await database;
+
+    await db.update(
+      "reminders",
+      {"nextTrigger": dt.toIso8601String()},
+      where: "id = ?",
+      whereArgs: [reminderId],
+    );
+  }
+
+  // =========================================================
+  //  KPIs DE ADHERENCIA
+  // =========================================================
+  static Future<void> addKpi({
+    required int reminderId,
+    required String code,
+    required String scheduledHour,
+    required bool tomo,
+    required int puntos,
+  }) async {
+    final db = await database;
+
+    await db.insert("kpis_tomas", {
+      "reminderId": reminderId,
+      "patientCode": code,
+      "fecha": DateTime.now().toIso8601String(),
+      "horaProgramada": scheduledHour,
+      "respondio": tomo ? "si" : "no",
+      "puntosOtorgados": puntos,
+    });
+  }
+
+  // =========================================================
+  //  PUNTOS
+  // =========================================================
+  static Future<void> addPoints(int puntos, String code) async {
+    final db = await database;
+
+    await db.rawUpdate(
+      """
+      UPDATE pacientes
+      SET points = points + ?
+      WHERE code = ?
+    """,
+      [puntos, code],
+    );
+  }
+
+  static Future<void> redeemPoints(int costo, String code) async {
+    final db = await database;
+
+    await db.rawUpdate(
+      """
+      UPDATE pacientes
+      SET points = points - ?
+      WHERE code = ? AND points >= ?
+    """,
+      [costo, code, costo],
+    );
+  }
+
+  // =========================================================
+  //  BORRAR BD (debug)
+  // =========================================================
+  static Future<void> clear() async {
+    final db = await database;
+    await db.delete("reminders");
+    await db.delete("kpis_tomas");
+    await db.delete("logros");
+    await db.delete("redes_apoyo");
   }
 }
