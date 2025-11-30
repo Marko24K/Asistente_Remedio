@@ -1,7 +1,10 @@
-import 'package:asistente_remedio/services/feedback_scheduler.dart';
+// lib/screens/patient_home_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+
 import '../data/database_helper.dart';
+import '../services/feedback_scheduler.dart';
 import 'reminder_details_screen.dart';
 import 'points_screen.dart';
 
@@ -28,38 +31,49 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
     final data = await DBHelper.getReminders(widget.patientCode);
     final now = DateTime.now();
 
-    reminders = data.map<Map<String, dynamic>>((r) {
+    reminders = [];
+
+    for (final r in data) {
       DateTime? next;
 
       if (r["nextTrigger"] != null) {
         next = DateTime.tryParse(r["nextTrigger"].toString());
       }
 
-      // PROGRAMAR NOTIFICACIÓN PRINCIPAL SI LA FECHA ES VÁLIDA
-      if (next != null && next.isAfter(now)) {
-        FeedbackScheduler.scheduleDueReminder(
-          reminderId: r["id"],
-          code: r["patientCode"],
-          medication: r["medication"],
-          hour: r["hour"],
-          when: next,
+      // si no hay nextTrigger o quedó atrás → recalcular usando hora inicial + startDate
+      if (next == null || next.isBefore(now)) {
+        next = DBHelper.calculateNextTrigger(
+          r["hour"] as String,
+          (r["frequencyHours"] ?? 24) as int,
+          startDate: r["startDate"] as String?,
         );
+
+        await DBHelper.updateNextTriggerById(r["id"] as int, next);
       }
 
-      return {
+      // programar notificación a la hora exacta
+      await FeedbackScheduler.scheduleDueReminder(
+        reminderId: r["id"] as int,
+        code: r["patientCode"] as String,
+        medication: r["medication"] as String,
+        hour: r["hour"] as String,
+        when: next,
+      );
+
+      reminders.add({
         "id": r["id"],
         "patientCode": r["patientCode"],
         "medication": r["medication"],
         "dose": r["dose"],
         "type": r["type"],
         "hour": r["hour"],
-        "notes": r["notes"],
-        "startDate": r["startDate"],
-        "endDate": r["endDate"],
-        "frequencyHours": r["frequencyHours"],
+        "notes": r["notes"] ?? "",
+        "startDate": r["startDate"] ?? "",
+        "endDate": r["endDate"] ?? "",
+        "frequencyHours": r["frequencyHours"] ?? 24,
         "nextTrigger": next,
-      };
-    }).toList();
+      });
+    }
 
     setState(() => loading = false);
   }

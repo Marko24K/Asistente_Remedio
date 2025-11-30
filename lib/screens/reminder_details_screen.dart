@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../data/database_helper.dart';
+import '../services/feedback_scheduler.dart';
 
 class ReminderDetailScreen extends StatelessWidget {
   final Map<String, dynamic> reminder;
@@ -17,7 +19,7 @@ class ReminderDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = reminder;
 
-    // nextTrigger puede venir como DateTime o como String -
+    // nextTrigger puede venir como DateTime o como String -> lo normalizo
     DateTime? nextTrigger;
     final rawNext = r["nextTrigger"];
     if (rawNext is DateTime) {
@@ -125,7 +127,19 @@ class ReminderDetailScreen extends StatelessWidget {
                 final now = DateTime.now();
                 final next = now.add(Duration(hours: freq));
 
-                await DBHelper.updateNextTriggerById(r["id"], next);
+                await DBHelper.updateNextTriggerById(r["id"] as int, next);
+
+                // Programar la siguiente notificación exacta
+                await FeedbackScheduler.scheduleDueReminder(
+                  reminderId: r["id"] as int,
+                  code: r["patientCode"] as String,
+                  medication: r["medication"] as String,
+                  hour: r["hour"] as String,
+                  when: next,
+                );
+
+                // Puntos por TOMAR ANTES
+                await DBHelper.addPoints(10, r["patientCode"] as String);
 
                 // Avisar al home que hubo cambios → recarga lista
                 if (context.mounted) {

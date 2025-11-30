@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../data/database_helper.dart';
+import '../services/feedback_scheduler.dart';
 
 class ConfirmMissedScreen extends StatefulWidget {
   final String code;
@@ -50,6 +51,23 @@ class _ConfirmMissedScreenState extends State<ConfirmMissedScreen> {
       tomo: tomo,
       puntos: puntos,
     );
+    // Actualizar nextTrigger y programar la próxima notificación principal
+    final reminder = await DBHelper.getReminderById(widget.reminderId);
+    if (reminder != null) {
+      final next = DBHelper.calculateNextTrigger(
+        reminder["hour"],
+        reminder["frequencyHours"],
+        startDate: reminder["startDate"],
+      );
+      await DBHelper.updateNextTriggerById(widget.reminderId, next);
+      await FeedbackScheduler.scheduleDueReminder(
+        reminderId: widget.reminderId,
+        code: widget.code,
+        medication: reminder["medication"],
+        hour: reminder["hour"],
+        when: next,
+      );
+    }
 
     _mostrarPopup(tomo, puntos);
   }
@@ -66,8 +84,8 @@ class _ConfirmMissedScreenState extends State<ConfirmMissedScreen> {
         ),
         content: Text(
           tomo
-              ? "Excelente 🟢\nHas ganado $puntos puntos."
-              : "Gracias por tu honestidad 🔴\nHas ganado $puntos puntos.",
+              ? "Excelente \nHas ganado $puntos puntos."
+              : "Gracias por tu honestidad \nHas ganado $puntos puntos.",
           textAlign: TextAlign.center,
           style: const TextStyle(fontSize: 20),
         ),

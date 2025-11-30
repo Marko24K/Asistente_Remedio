@@ -106,34 +106,43 @@ class DBHelper {
           "nivel": 1,
         });
 
-        // recordatorio ejemplo
+        // Recordatorios ejemplo con nextTrigger COHERENTE
+        final next1 = DBHelper.calculateNextTrigger(
+          "08:00",
+          4,
+          startDate: "2025-11-21",
+        );
+
         await db.insert("reminders", {
           "patientCode": "A92KD7",
           "medication": "Paracetamol 500mg",
           "dose": "1 tableta",
           "type": "Pastilla",
-          "hour": "19:00",
+          "hour": "08:00",
           "notes": "Tomar con agua",
           "startDate": "2025-11-21",
           "endDate": "2025-12-24",
-          "frequencyHours": 1,
-          "nextTrigger": DateTime.now()
-              .add(const Duration(hours: 1))
-              .toIso8601String(),
+          "frequencyHours": 4,
+          "nextTrigger": next1.toIso8601String(),
         });
+
+        final next2 = DBHelper.calculateNextTrigger(
+          "08:00",
+          2,
+          startDate: "2025-11-21",
+        );
+
         await db.insert("reminders", {
           "patientCode": "A92KD7",
           "medication": "Ibuprofeno",
           "dose": "500g",
           "type": "Pastilla",
-          "hour": "19:30",
+          "hour": "08:00",
           "notes": "Tomar con agua",
-          "startDate": "2025-11-29",
+          "startDate": "2025-11-21",
           "endDate": "2025-12-24",
-          "frequencyHours": 1,
-          "nextTrigger": DateTime.now()
-              .add(const Duration(hours: 1))
-              .toIso8601String(),
+          "frequencyHours": 2,
+          "nextTrigger": next2.toIso8601String(),
         });
       },
     );
@@ -211,9 +220,7 @@ class DBHelper {
     return db.insert("reminders", data);
   }
 
-  // =====================
   // Obtener reminder por ID
-  // =====================
   static Future<Map<String, dynamic>?> getReminderById(int id) async {
     final db = await database;
     final res = await db.query("reminders", where: "id = ?", whereArgs: [id]);
@@ -226,7 +233,7 @@ class DBHelper {
     return db.query("reminders", where: "patientCode = ?", whereArgs: [code]);
   }
 
-  //horas
+  // Actualizar nextTrigger (ISO8601)
   static Future<void> updateReminderNextTrigger(int id, String newDate) async {
     final db = await database;
     await db.update(
@@ -237,6 +244,7 @@ class DBHelper {
     );
   }
 
+  // Cálculo PROFESIONAL del próximo disparo
   static DateTime calculateNextTrigger(
     String hour,
     int frequencyHours, {
@@ -244,47 +252,39 @@ class DBHelper {
   }) {
     final now = DateTime.now();
 
-    // --- PROTECCIÓN: si frecuencia no es válida ---
-    if (frequencyHours <= 0) {
-      frequencyHours = 24; // fallback seguro
-    }
+    if (frequencyHours <= 0) frequencyHours = 24; // seguridad
 
-    // --- PARSEAR HORA “HH:MM” ---
+    // parse HH:mm
     final parts = hour.split(":");
     final h = int.parse(parts[0]);
     final m = int.parse(parts[1]);
 
-    // --- SI HAY startDate, usarla COMO BASE ---
-    DateTime baseDay;
+    late DateTime base;
+
+    // si hay fecha de inicio, usamos ese día + la hora
     if (startDate != null) {
       final sd = DateTime.tryParse(startDate);
-
       if (sd != null) {
-        baseDay = DateTime(sd.year, sd.month, sd.day, h, m);
+        base = DateTime(sd.year, sd.month, sd.day, h, m);
 
-        // si startDate es en el futuro → devolver startDate + hour inmediata
-        if (baseDay.isAfter(now)) {
-          return baseDay;
+        // si el tratamiento aún NO comienza, esa es la primera toma
+        if (base.isAfter(now)) {
+          return base;
         }
-
-        // si startDate es hoy, usamos el cálculo normal de ciclos
       } else {
-        // si startDate es inválida, usar hoy
-        baseDay = DateTime(now.year, now.month, now.day, h, m);
+        base = DateTime(now.year, now.month, now.day, h, m);
       }
     } else {
-      // si no hay startDate → usar HOY
-      baseDay = DateTime(now.year, now.month, now.day, h, m);
+      // sin fecha de inicio: hoy a la hora indicada
+      base = DateTime(now.year, now.month, now.day, h, m);
     }
 
-    DateTime next = baseDay;
-
-    // --- SI YA PASÓ EL HORARIO PROYECTADO DE HOY → ciclo siguiente ---
-    while (next.isBefore(now)) {
-      next = next.add(Duration(hours: frequencyHours));
+    // avanzar ciclos hasta que quede en el futuro
+    while (base.isBefore(now)) {
+      base = base.add(Duration(hours: frequencyHours));
     }
 
-    return next;
+    return base;
   }
 
   static Future<void> updateNextTriggerById(int reminderId, DateTime dt) async {

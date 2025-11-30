@@ -1,9 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+
 import '../data/database_helper.dart';
 import '../services/feedback_scheduler.dart';
 
 class DueReminderScreen extends StatefulWidget {
+  /// Este map viene desde la notificación y normalmente contiene:
+  /// { "reminderId": int, "code": String }
   final Map reminder;
 
   const DueReminderScreen({super.key, required this.reminder});
@@ -16,34 +19,70 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
   bool marked = false;
   Timer? t;
 
+  Map<String, dynamic>? r;
+  bool loading = true;
+
   @override
   void initState() {
     super.initState();
+    _loadReminder();
+  }
 
-    // 2 minutos para marcar
+  Future<void> _loadReminder() async {
+    int? id = widget.reminder["id"] as int?;
+    id ??= widget.reminder["reminderId"] as int?;
+
+    if (id == null) {
+      if (mounted) Navigator.pop(context);
+      return;
+    }
+
+    final dbReminder = await DBHelper.getReminderById(id);
+    if (!mounted) return;
+
+    if (dbReminder == null) {
+      Navigator.pop(context);
+      return;
+    }
+
+    setState(() {
+      r = dbReminder;
+      loading = false;
+    });
+
+    _startTimer();
+  }
+
+  void _startTimer() {
     t = Timer(const Duration(minutes: 2), () async {
-      if (!marked) {
-        // Notificación diferida
+      if (!marked && r != null) {
+        final freq = (r!["frequencyHours"] ?? 24) as int;
+        final hour = r!["hour"] as String;
+        final startDate = r!["startDate"] as String?;
+
+        // Programar notificación diferida
         await FeedbackScheduler.scheduleDeferredForReminder(
-          reminderId: widget.reminder["id"],
-          patientCode: widget.reminder["patientCode"],
-          medication: widget.reminder["medication"],
-          scheduledHour: widget.reminder["hour"],
+          reminderId: r!["id"] as int,
+          patientCode: r!["patientCode"] as String,
+          medication: r!["medication"] as String,
+          scheduledHour: hour,
         );
 
-        // Calcular siguiente toma
-        final freq = widget.reminder["frequencyHours"];
-        final hour = widget.reminder["hour"];
-        final next = DBHelper.calculateNextTrigger(hour, freq);
+        // Calcular siguiente toma en función de la hora INICIAL
+        final next = DBHelper.calculateNextTrigger(
+          hour,
+          freq,
+          startDate: startDate,
+        );
 
-        await DBHelper.updateNextTriggerById(widget.reminder["id"], next);
+        await DBHelper.updateNextTriggerById(r!["id"] as int, next);
 
-        // AGENDAR SIGUIENTE TOMADA
+        // Programar la siguiente notificación a la hora exacta
         await FeedbackScheduler.scheduleDueReminder(
-          reminderId: widget.reminder["id"],
-          code: widget.reminder["patientCode"],
-          medication: widget.reminder["medication"],
-          hour: widget.reminder["hour"],
+          reminderId: r!["id"] as int,
+          code: r!["patientCode"] as String,
+          medication: r!["medication"] as String,
+          hour: hour,
           when: next,
         );
       }
@@ -60,7 +99,11 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final r = widget.reminder;
+    if (loading || r == null) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    final reminder = r!;
 
     return Scaffold(
       body: Center(
@@ -69,7 +112,7 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
             const SizedBox(height: 70),
 
             Text(
-              "Es hora de tu medicamento\n${r["medication"]}",
+              "Es hora de tu medicamento\n${reminder["medication"]}",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
             ),
@@ -78,25 +121,34 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
 
             ElevatedButton(
               onPressed: () async {
+                if (r == null) return;
                 marked = true;
 
-                final freq = r["frequencyHours"];
-                final hour = r["hour"];
+                final freq = (reminder["frequencyHours"] ?? 24) as int;
+                final hour = reminder["hour"] as String;
+                final startDate = reminder["startDate"] as String?;
 
-                final next = DBHelper.calculateNextTrigger(hour, freq);
+                final next = DBHelper.calculateNextTrigger(
+                  hour,
+                  freq,
+                  startDate: startDate,
+                );
 
-                await DBHelper.updateNextTriggerById(r["id"], next);
+                await DBHelper.updateNextTriggerById(
+                  reminder["id"] as int,
+                  next,
+                );
 
-                // AGENDAR SIGUIENTE NOTIFICACIÓN
                 await FeedbackScheduler.scheduleDueReminder(
-                  reminderId: r["id"],
-                  code: r["patientCode"],
-                  medication: r["medication"],
-                  hour: r["hour"],
+                  reminderId: reminder["id"] as int,
+                  code: reminder["patientCode"] as String,
+                  medication: reminder["medication"] as String,
+                  hour: hour,
                   when: next,
                 );
 
-                await DBHelper.addPoints(10, r["patientCode"]);
+                // Puntos por marcar a la hora
+                await DBHelper.addPoints(10, reminder["patientCode"]);
 
                 // ignore: use_build_context_synchronously
                 if (mounted) Navigator.pop(context);
