@@ -106,43 +106,54 @@ class DBHelper {
           "nivel": 1,
         });
 
-        // Recordatorios ejemplo con nextTrigger COHERENTE
-        final next1 = DBHelper.calculateNextTrigger(
-          "08:00",
-          4,
-          startDate: "2025-11-21",
-        );
-
         await db.insert("reminders", {
           "patientCode": "A92KD7",
           "medication": "Paracetamol 500mg",
           "dose": "1 tableta",
           "type": "Pastilla",
-          "hour": "08:00",
+          "hour": "21:00",
           "notes": "Tomar con agua",
-          "startDate": "2025-11-21",
+          "startDate": "2025-11-30",
           "endDate": "2025-12-24",
           "frequencyHours": 4,
-          "nextTrigger": next1.toIso8601String(),
+          "nextTrigger": null,
         });
-
-        final next2 = DBHelper.calculateNextTrigger(
-          "08:00",
-          2,
-          startDate: "2025-11-21",
-        );
+        await db.insert("reminders", {
+          "patientCode": "A92KD7",
+          "medication": "Omeprazol",
+          "dose": "200g",
+          "type": "Pastilla",
+          "hour": "20:50",
+          "notes": "Tomar con agua",
+          "startDate": "2025-11-30",
+          "endDate": "2025-12-24",
+          "frequencyHours": 5,
+          "nextTrigger": null,
+        });
+        await db.insert("reminders", {
+          "patientCode": "A92KD7",
+          "medication": "loratandina",
+          "dose": "200g",
+          "type": "Pastilla",
+          "hour": "20:45",
+          "notes": "Tomar con agua",
+          "startDate": "2025-11-30",
+          "endDate": "2025-12-24",
+          "frequencyHours": 1,
+          "nextTrigger": null,
+        });
 
         await db.insert("reminders", {
           "patientCode": "A92KD7",
           "medication": "Ibuprofeno",
-          "dose": "500g",
-          "type": "Pastilla",
-          "hour": "08:00",
-          "notes": "Tomar con agua",
-          "startDate": "2025-11-21",
+          "dose": "5ml",
+          "type": "líq",
+          "hour": "20:37",
+          "notes": "tomar al seco",
+          "startDate": "2025-11-30",
           "endDate": "2025-12-24",
-          "frequencyHours": 2,
-          "nextTrigger": next2.toIso8601String(),
+          "frequencyHours": 8,
+          "nextTrigger": null,
         });
       },
     );
@@ -251,6 +262,11 @@ class DBHelper {
     String? startDate,
   }) {
     final now = DateTime.now();
+    print('🔄 [CALC_TRIGGER] Calculando próximo disparo:');
+    print('   Ahora: $now');
+    print('   Hora indicada: $hour');
+    print('   Frecuencia: $frequencyHours horas');
+    print('   Fecha inicio: $startDate');
 
     if (frequencyHours <= 0) frequencyHours = 24; // seguridad
 
@@ -266,23 +282,32 @@ class DBHelper {
       final sd = DateTime.tryParse(startDate);
       if (sd != null) {
         base = DateTime(sd.year, sd.month, sd.day, h, m);
+        print('   Base desde startDate: $base');
 
         // si el tratamiento aún NO comienza, esa es la primera toma
         if (base.isAfter(now)) {
+          print('✅ Primera toma (startDate en futuro): $base');
           return base;
         }
       } else {
         base = DateTime(now.year, now.month, now.day, h, m);
+        print('   startDate inválido, usando hoy: $base');
       }
     } else {
       // sin fecha de inicio: hoy a la hora indicada
       base = DateTime(now.year, now.month, now.day, h, m);
+      print('   Sin startDate, usando hoy: $base');
     }
 
     // avanzar ciclos hasta que quede en el futuro
-    while (base.isBefore(now)) {
+    int ciclos = 0;
+    while (base.isBefore(now) || base.isAtSameMomentAs(now)) {
       base = base.add(Duration(hours: frequencyHours));
+      ciclos++;
     }
+
+    print('   Ciclos avanzados: $ciclos');
+    print('✅ Próximo disparo final: $base');
 
     return base;
   }

@@ -3,18 +3,12 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    // Add the dependency for the Google services Gradle plugin
-    id("com.google.gms.google-services") 
-
 }
+
 dependencies {
-    // Import the Firebase BoM
-    implementation(platform("com.google.firebase:firebase-bom:34.5.0"))
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
     implementation("androidx.core:core-ktx:1.12.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
-    implementation("com.google.firebase:firebase-firestore")
-
 }
 android {
     namespace = "com.example.asistente_remedio"
@@ -37,8 +31,8 @@ android {
         applicationId = "com.example.asistente_remedio"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdkVersion(23)
-        targetSdk = flutter.targetSdkVersion
+        minSdkVersion(31)
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

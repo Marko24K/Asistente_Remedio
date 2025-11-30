@@ -122,24 +122,38 @@ class ReminderDetailScreen extends StatelessWidget {
             GestureDetector(
               onTap: () async {
                 final freq = (r["frequencyHours"] ?? 24) as int;
+                final reminderId = r["id"] as int;
+                final code = r["patientCode"] as String;
+                final hora = r["hour"] as String;
+                final puntos = 10;
 
-                // La toma real es AHORA
+                // La toma real es AHORA → la próxima es en freq horas
                 final now = DateTime.now();
                 final next = now.add(Duration(hours: freq));
 
-                await DBHelper.updateNextTriggerById(r["id"] as int, next);
+                // Actualizar nextTrigger en BD
+                await DBHelper.updateNextTriggerById(reminderId, next);
 
                 // Programar la siguiente notificación exacta
                 await FeedbackScheduler.scheduleDueReminder(
-                  reminderId: r["id"] as int,
-                  code: r["patientCode"] as String,
+                  reminderId: reminderId,
+                  code: code,
                   medication: r["medication"] as String,
-                  hour: r["hour"] as String,
+                  hour: hora,
                   when: next,
                 );
 
-                // Puntos por TOMAR ANTES
-                await DBHelper.addPoints(10, r["patientCode"] as String);
+                // Registrar en KPIs que se tomó ANTES de la hora
+                await DBHelper.addKpi(
+                  reminderId: reminderId,
+                  code: code,
+                  scheduledHour: hora,
+                  tomo: true,
+                  puntos: puntos,
+                );
+
+                // Sumar puntos por TOMAR ANTES
+                await DBHelper.addPoints(puntos, code);
 
                 // Avisar al home que hubo cambios → recarga lista
                 if (context.mounted) {

@@ -8,6 +8,7 @@ import '../services/feedback_scheduler.dart';
 import 'reminder_details_screen.dart';
 import 'points_screen.dart';
 
+
 class PatientHomeScreen extends StatefulWidget {
   final String patientCode;
 
@@ -20,6 +21,7 @@ class PatientHomeScreen extends StatefulWidget {
 class _PatientHomeScreenState extends State<PatientHomeScreen> {
   List<Map<String, dynamic>> reminders = [];
   bool loading = true;
+  bool _schedulingDone = false;
 
   @override
   void initState() {
@@ -28,7 +30,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
   }
 
   Future<void> loadReminders() async {
+    print('📋 [HOME_LOAD] Cargando recordatorios para: ${widget.patientCode}');
     final data = await DBHelper.getReminders(widget.patientCode);
+    print('   Total recordatorios en BD: ${data.length}');
+
     final now = DateTime.now();
 
     reminders = [];
@@ -40,25 +45,34 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
         next = DateTime.tryParse(r["nextTrigger"].toString());
       }
 
+      print('📌 Procesando: ${r["medication"]} (ID: ${r["id"]})');
+
       // si no hay nextTrigger o quedó atrás → recalcular usando hora inicial + startDate
       if (next == null || next.isBefore(now)) {
+        print('   ⚠️  nextTrigger nulo o pasado, recalculando...');
         next = DBHelper.calculateNextTrigger(
           r["hour"] as String,
           (r["frequencyHours"] ?? 24) as int,
           startDate: r["startDate"] as String?,
         );
 
+        print('   ✅ Nuevo nextTrigger: $next');
         await DBHelper.updateNextTriggerById(r["id"] as int, next);
+      } else {
+        print('   ✅ nextTrigger válido: $next');
       }
 
-      // programar notificación a la hora exacta
-      await FeedbackScheduler.scheduleDueReminder(
-        reminderId: r["id"] as int,
-        code: r["patientCode"] as String,
-        medication: r["medication"] as String,
-        hour: r["hour"] as String,
-        when: next,
-      );
+      // SOLO programar si NO se ha hecho ya en esta sesión
+      if (!_schedulingDone) {
+        print('   📞 Programando notificación...');
+        await FeedbackScheduler.scheduleDueReminder(
+          reminderId: r["id"] as int,
+          code: r["patientCode"] as String,
+          medication: r["medication"] as String,
+          hour: r["hour"] as String,
+          when: next,
+        );
+      }
 
       reminders.add({
         "id": r["id"],
@@ -75,6 +89,12 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
       });
     }
 
+    _schedulingDone = true;
+    print('✅ Pantalla de inicio cargada (${reminders.length} recordatorios)');
+    
+    // DEBUG: Verificar notificaciones pendientes
+    await FeedbackScheduler.debugPendingNotifications();
+    
     setState(() => loading = false);
   }
 
@@ -220,6 +240,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           await loadReminders();
         }
       },
+      
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),

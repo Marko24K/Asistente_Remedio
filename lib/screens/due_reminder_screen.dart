@@ -127,28 +127,40 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
                 final freq = (reminder["frequencyHours"] ?? 24) as int;
                 final hour = reminder["hour"] as String;
                 final startDate = reminder["startDate"] as String?;
+                final reminderId = reminder["id"] as int;
+                final code = reminder["patientCode"] as String;
+                final puntos = 10;
 
+                // Calcular siguiente toma en función de la hora INICIAL
                 final next = DBHelper.calculateNextTrigger(
                   hour,
                   freq,
                   startDate: startDate,
                 );
 
-                await DBHelper.updateNextTriggerById(
-                  reminder["id"] as int,
-                  next,
-                );
+                // Actualizar nextTrigger en BD
+                await DBHelper.updateNextTriggerById(reminderId, next);
 
+                // Programar la siguiente notificación a la hora exacta
                 await FeedbackScheduler.scheduleDueReminder(
-                  reminderId: reminder["id"] as int,
-                  code: reminder["patientCode"] as String,
+                  reminderId: reminderId,
+                  code: code,
                   medication: reminder["medication"] as String,
                   hour: hour,
                   when: next,
                 );
 
-                // Puntos por marcar a la hora
-                await DBHelper.addPoints(10, reminder["patientCode"]);
+                // Registrar en KPIs que se tomó a la hora
+                await DBHelper.addKpi(
+                  reminderId: reminderId,
+                  code: code,
+                  scheduledHour: hour,
+                  tomo: true,
+                  puntos: puntos,
+                );
+
+                // Sumar puntos por marcar a la hora
+                await DBHelper.addPoints(puntos, code);
 
                 // ignore: use_build_context_synchronously
                 if (mounted) Navigator.pop(context);

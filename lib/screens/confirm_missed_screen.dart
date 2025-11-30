@@ -43,7 +43,7 @@ class _ConfirmMissedScreenState extends State<ConfirmMissedScreen> {
   Future<void> _registrarRespuesta(bool tomo) async {
     final puntos = tomo ? 15 : 5;
 
-    await DBHelper.addPoints(puntos, widget.code);
+    // Registrar en KPIs
     await DBHelper.addKpi(
       reminderId: widget.reminderId,
       code: widget.code,
@@ -51,20 +51,29 @@ class _ConfirmMissedScreenState extends State<ConfirmMissedScreen> {
       tomo: tomo,
       puntos: puntos,
     );
-    // Actualizar nextTrigger y programar la próxima notificación principal
+
+    // Sumar puntos al paciente
+    await DBHelper.addPoints(puntos, widget.code);
+
+    // Obtener el recordatorio para recalcular próxima toma
     final reminder = await DBHelper.getReminderById(widget.reminderId);
     if (reminder != null) {
+      // Calcular siguiente toma en función de la hora INICIAL
       final next = DBHelper.calculateNextTrigger(
-        reminder["hour"],
-        reminder["frequencyHours"],
-        startDate: reminder["startDate"],
+        reminder["hour"] as String,
+        (reminder["frequencyHours"] ?? 24) as int,
+        startDate: reminder["startDate"] as String?,
       );
+
+      // Actualizar nextTrigger en BD
       await DBHelper.updateNextTriggerById(widget.reminderId, next);
+
+      // Programar la próxima notificación de hora exacta
       await FeedbackScheduler.scheduleDueReminder(
         reminderId: widget.reminderId,
         code: widget.code,
-        medication: reminder["medication"],
-        hour: reminder["hour"],
+        medication: reminder["medication"] as String,
+        hour: reminder["hour"] as String,
         when: next,
       );
     }
