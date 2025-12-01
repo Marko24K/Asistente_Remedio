@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
+import 'package:flutter/services.dart';
 
 import 'data/database_helper.dart';
 import 'services/feedback_scheduler.dart';
+import 'services/notification_worker.dart';
 
 import 'screens/welcome_screen.dart';
 import 'screens/patient_login.dart';
@@ -15,6 +17,7 @@ import 'screens/due_reminder_screen.dart';
 import 'screens/confirm_missed_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+const bootChannel = MethodChannel('com.example.asistente_remedio/boot');
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,9 +27,28 @@ void main() async {
   tz.initializeTimeZones();
   tz.setLocalLocation(tz.getLocation("America/Santiago"));
 
+  // Inicializar WorkManager ANTES que FeedbackScheduler
+  NotificationWorker.init();
+
   await FeedbackScheduler.init();
 
+  // Manejar reschedule post-boot
+  _handleBootReschedule();
+
   runApp(const MyApp());
+}
+
+Future<void> _handleBootReschedule() async {
+  try {
+    final result = await bootChannel.invokeMethod<bool>(
+      'rescheduleNotifications',
+    );
+    if (result == true) {
+      print('✅ [MAIN] Reschedule post-boot completado');
+    }
+  } catch (e) {
+    print('⚠️  [MAIN] No se pudo completar reschedule: $e');
+  }
 }
 
 class MyApp extends StatefulWidget {

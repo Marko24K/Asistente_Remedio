@@ -8,7 +8,6 @@ import '../services/feedback_scheduler.dart';
 import 'reminder_details_screen.dart';
 import 'points_screen.dart';
 
-
 class PatientHomeScreen extends StatefulWidget {
   final String patientCode;
 
@@ -91,10 +90,10 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
 
     _schedulingDone = true;
     print('✅ Pantalla de inicio cargada (${reminders.length} recordatorios)');
-    
+
     // DEBUG: Verificar notificaciones pendientes
     await FeedbackScheduler.debugPendingNotifications();
-    
+
     setState(() => loading = false);
   }
 
@@ -125,27 +124,88 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           child: Column(
             children: [
-              // Header centrado
+              // Header con botón de test
               Row(
-                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Icon(Icons.circle, color: Colors.green, size: 12),
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE6F4EA),
-                      borderRadius: BorderRadius.circular(50),
-                    ),
-                    child: const Text(
-                      "AsistenteRemedios",
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF1B4332),
+                  Row(
+                    children: [
+                      const Icon(Icons.circle, color: Colors.green, size: 12),
+                      const SizedBox(width: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE6F4EA),
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                        child: const Text(
+                          "Asistente Remedios",
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1B4332),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Botón de test
+                  GestureDetector(
+                    onLongPress: () async {
+                      showDialog(
+                        context: context,
+                        builder: (_) => AlertDialog(
+                          title: const Text("🧪 Testing"),
+                          content: const Text("¿Qué deseas probar?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                await FeedbackScheduler.testImmediateNotification();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Notificación inmediata enviada',
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: const Text("Notif Inmediata"),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                await FeedbackScheduler.testScheduledNotification();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Notificación en 5 seg'),
+                                  ),
+                                );
+                              },
+                              child: const Text("Notif 5 seg"),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        "🧪",
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.red.shade800,
+                        ),
                       ),
                     ),
                   ),
@@ -240,7 +300,7 @@ class _PatientHomeScreenState extends State<PatientHomeScreen> {
           await loadReminders();
         }
       },
-      
+
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.all(14),

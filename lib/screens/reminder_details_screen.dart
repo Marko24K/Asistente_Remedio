@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database_helper.dart';
 import '../services/feedback_scheduler.dart';
+import '../services/audio_player_service.dart';
 
 class ReminderDetailScreen extends StatelessWidget {
   final Map<String, dynamic> reminder;
@@ -131,6 +132,9 @@ class ReminderDetailScreen extends StatelessWidget {
                 final now = DateTime.now();
                 final next = now.add(Duration(hours: freq));
 
+                // Cancelar la notificación anterior
+                await FeedbackScheduler.cancelNotification(reminderId);
+
                 // Actualizar nextTrigger en BD
                 await DBHelper.updateNextTriggerById(reminderId, next);
 
@@ -155,9 +159,48 @@ class ReminderDetailScreen extends StatelessWidget {
                 // Sumar puntos por TOMAR ANTES
                 await DBHelper.addPoints(puntos, code);
 
-                // Avisar al home que hubo cambios → recarga lista
+                // Reproducir sonido de éxito
+                await AudioPlayerService.playSound('correct_ding.mp3');
+
+                // Mostrar popup con puntos
                 if (context.mounted) {
-                  Navigator.pop(context, true);
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text("¡Excelente!"),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.star, color: Colors.amber, size: 60),
+                          const SizedBox(height: 16),
+                          Text(
+                            "+$puntos puntos",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            "Recordatorio reprogramado para más tarde.",
+                          ),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  // Cerrar después de 2 segundos
+                  await Future.delayed(const Duration(seconds: 2));
+                  if (context.mounted) {
+                    Navigator.pop(context, true);
+                  }
                 }
               },
               child: Container(

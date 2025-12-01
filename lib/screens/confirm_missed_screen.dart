@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../data/database_helper.dart';
 import '../services/feedback_scheduler.dart';
+import '../services/audio_player_service.dart';
 
 class ConfirmMissedScreen extends StatefulWidget {
   final String code;
@@ -52,8 +53,10 @@ class _ConfirmMissedScreenState extends State<ConfirmMissedScreen> {
       puntos: puntos,
     );
 
-    // Sumar puntos al paciente
-    await DBHelper.addPoints(puntos, widget.code);
+    // Sumar puntos al paciente (solo si "Sí" respondió)
+    if (tomo) {
+      await DBHelper.addPoints(puntos, widget.code);
+    }
 
     // Obtener el recordatorio para recalcular próxima toma
     final reminder = await DBHelper.getReminderById(widget.reminderId);
@@ -78,35 +81,86 @@ class _ConfirmMissedScreenState extends State<ConfirmMissedScreen> {
       );
     }
 
-    _mostrarPopup(tomo, puntos);
-  }
+    // Reproducir sonido y mostrar popup según respuesta
+    if (tomo) {
+      // Sí: Sonido de éxito + popup con puntos
+      await AudioPlayerService.playSound('correct_ding.mp3');
 
-  void _mostrarPopup(bool tomo, int puntos) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
-        title: Text(
-          tomo ? "¡Gracias!" : "Gracias por avisar",
-          textAlign: TextAlign.center,
-        ),
-        content: Text(
-          tomo
-              ? "Excelente \nHas ganado $puntos puntos."
-              : "Gracias por tu honestidad \nHas ganado $puntos puntos.",
-          textAlign: TextAlign.center,
-          style: const TextStyle(fontSize: 20),
-        ),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("OK"),
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("¡Qué buena memoria!"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.check_circle, color: Colors.green, size: 60),
+                const SizedBox(height: 16),
+                Text(
+                  "+$puntos puntos",
+                  style: const TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text("Excelente, encontraste tu medicamento a tiempo."),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("OK"),
+              ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
+      }
+    } else {
+      // No: Sonido de negación + popup consolador SIN puntos adicionales
+      await AudioPlayerService.playSound('confirm_no.mp3');
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text("Sin problema"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.favorite, color: Colors.red, size: 60),
+                const SizedBox(height: 16),
+                const Text(
+                  "No pasa nada",
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  "La próxima vez recuerda tomar tu medicamento. Tú puedes.",
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    }
+
+    // Cerrar después de 2 segundos
+    await Future.delayed(const Duration(seconds: 2));
+    if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   @override

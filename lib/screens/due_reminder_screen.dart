@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../data/database_helper.dart';
 import '../services/feedback_scheduler.dart';
+import '../services/audio_player_service.dart';
 
 class DueReminderScreen extends StatefulWidget {
   /// Este map viene desde la notificación y normalmente contiene:
@@ -131,6 +132,9 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
                 final code = reminder["patientCode"] as String;
                 final puntos = 10;
 
+                // Cancelar la notificación anterior
+                await FeedbackScheduler.cancelNotification(reminderId);
+
                 // Calcular siguiente toma en función de la hora INICIAL
                 final next = DBHelper.calculateNextTrigger(
                   hour,
@@ -162,8 +166,51 @@ class _DueReminderScreenState extends State<DueReminderScreen> {
                 // Sumar puntos por marcar a la hora
                 await DBHelper.addPoints(puntos, code);
 
-                // ignore: use_build_context_synchronously
-                if (mounted) Navigator.pop(context);
+                // Reproducir sonido de éxito
+                await AudioPlayerService.playSound('correct_ding.mp3');
+
+                // Mostrar popup con puntos
+                if (mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text("¡Perfecto!"),
+                      content: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.check_circle,
+                            color: Colors.green,
+                            size: 60,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            "+$puntos puntos",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text("Muy bien, a la hora exacta."),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text("OK"),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  // Cerrar después de 2 segundos
+                  await Future.delayed(const Duration(seconds: 2));
+                  if (mounted) {
+                    Navigator.pop(context);
+                  }
+                }
               },
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(

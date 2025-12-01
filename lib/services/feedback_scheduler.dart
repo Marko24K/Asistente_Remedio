@@ -1,38 +1,48 @@
-import 'dart:math';
 import 'dart:io' show Platform;
-import 'package:flutter/material.dart';
+import 'dart:math';
+
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
 
 import '../data/database_helper.dart';
 import '../main.dart';
+import 'device_optimization_helper.dart';
+import 'notification_worker.dart';
 
 class FeedbackScheduler {
   static final FlutterLocalNotificationsPlugin notifications =
       FlutterLocalNotificationsPlugin();
+
+  static const _dueChannelId = 'due_channel_v2';
+  static const _feedbackChannelId = 'feedback_channel_v2';
+
   static bool _hasNotificationPermission = false;
   static bool _hasExactAlarmPermission = false;
+  static bool _initialized = false;
 
   // ===============================================
   // INIT
   // ===============================================
   static Future<void> init() async {
-    print('🔔 [INIT] Inicializando FeedbackScheduler...');
+    if (_initialized) {
+      print('[INIT] FeedbackScheduler ya inicializado, ignorando...');
+      return;
+    }
 
-    const androidSettings = AndroidInitializationSettings(
-      'notification_icon',
-    );
+    print('[INIT] Inicializando FeedbackScheduler...');
 
+    // Inicializar WorkManager primero
+    NotificationWorker.init();
+
+    const androidSettings = AndroidInitializationSettings('notification_icon');
     const initSettings = InitializationSettings(android: androidSettings);
 
     await notifications.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (resp) async {
-        print('👉 [NOTIF TAP] Usuario tocó notificación: ${resp.payload}');
-
         final payload = resp.payload ?? "";
 
-        // ---- DIFERIDA ----
+        // Diferida
         if (payload.startsWith("missed|")) {
           final parts = payload.split("|");
           final reminderId = int.tryParse(parts[1]) ?? 0;
@@ -40,11 +50,9 @@ class FeedbackScheduler {
 
           final reminder = await DBHelper.getReminderById(reminderId);
           if (reminder == null) {
-            print('❌ [ERROR] No se encontró reminder con ID: $reminderId');
+            print('[ERROR] No se encontró reminder con ID: $reminderId');
             return;
           }
-
-          print('✅ Abriendo ConfirmMissedScreen...');
 
           navigatorKey.currentState?.pushNamed(
             "/confirm_missed",
@@ -58,13 +66,11 @@ class FeedbackScheduler {
           return;
         }
 
-        // ---- RECORDATORIO NORMAL ----
+        // Recordatorio normal
         if (payload.startsWith("due|")) {
           final parts = payload.split("|");
           final reminderId = int.tryParse(parts[1]) ?? 0;
           final code = parts[2];
-
-          print('✅ Abriendo DueReminderScreen...');
 
           navigatorKey.currentState?.pushNamed(
             "/due_reminder",
@@ -74,21 +80,19 @@ class FeedbackScheduler {
       },
     );
 
-    print('✅ Notificaciones inicializadas');
+    print('[INIT] Notificaciones inicializadas');
 
     // Android 13+ permisos + canales
     if (Platform.isAndroid) {
-      print('🤖 Configurando Android 13+...');
+      print('[INIT] Configurando Android 13+...');
 
       final androidPlugin = notifications
           .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin
-          >();
+              AndroidFlutterLocalNotificationsPlugin>();
 
       if (androidPlugin != null) {
-        // Canales con importancia máxima para garantizar entrega
         const dueChannel = AndroidNotificationChannel(
-          'due_channel',
+          _dueChannelId,
           'Recordatorios de hora exacta',
           description: 'Notifica cuando es la hora exacta del medicamento',
           importance: Importance.max,
@@ -96,10 +100,12 @@ class FeedbackScheduler {
           enableVibration: true,
           showBadge: true,
           enableLights: true,
+          sound: RawResourceAndroidNotificationSound('pills'),
+          audioAttributesUsage: AudioAttributesUsage.alarm,
         );
 
         const feedbackChannel = AndroidNotificationChannel(
-          'feedback_channel',
+          _feedbackChannelId,
           'Recordatorios diferidos',
           description: 'Preguntas sobre tomas no marcadas a la hora',
           importance: Importance.max,
@@ -107,36 +113,56 @@ class FeedbackScheduler {
           enableVibration: true,
           showBadge: true,
           enableLights: true,
+          sound: RawResourceAndroidNotificationSound('pills'),
+          audioAttributesUsage: AudioAttributesUsage.alarm,
         );
 
-        print('📍 Creando canales...');
         await androidPlugin.createNotificationChannel(dueChannel);
         await androidPlugin.createNotificationChannel(feedbackChannel);
-        print('✅ Canales creados');
+        print('[INIT] Canales creados');
 
-        print('🔐 Solicitando permisos...');
         _hasNotificationPermission =
             await androidPlugin.requestNotificationsPermission() ?? false;
-        print('   POST_NOTIFICATIONS: $_hasNotificationPermission');
-
         _hasExactAlarmPermission =
             await androidPlugin.requestExactAlarmsPermission() ?? false;
-        print('   SCHEDULE_EXACT_ALARM: $_hasExactAlarmPermission');
 
         if (!_hasNotificationPermission) {
-          print('⚠️  ADVERTENCIA: Permiso POST_NOTIFICATIONS denegado');
+          print('[INIT] ADVERTENCIA: Permiso POST_NOTIFICATIONS denegado');
         }
         if (!_hasExactAlarmPermission) {
-          print('⚠️  ADVERTENCIA: Permiso SCHEDULE_EXACT_ALARM denegado');
+          print('[INIT] ADVERTENCIA: Permiso SCHEDULE_EXACT_ALARM denegado');
         }
       } else {
         print(
-          '❌ [ERROR] No se pudo obtener AndroidFlutterLocalNotificationsPlugin',
+          '[INIT] ERROR: No se pudo obtener AndroidFlutterLocalNotificationsPlugin',
         );
       }
+
+      // Solicitar ignorar optimización de batería
+      await _requestIgnoreBatteryOptimization();
+
+      // Workaround Motorola
+      print('[INIT] Verificando workarounds específicos de dispositivo...');
+      await DeviceOptimizationHelper.applyMotorolaWorkaround();
     }
 
-    print('✅ FeedbackScheduler inicializado');
+    _initialized = true;
+    print('[INIT] FeedbackScheduler inicializado completamente');
+  }
+
+  // ===============================================
+  // Solicitar ignorar optimización de batería
+  // ===============================================
+  static Future<void> _requestIgnoreBatteryOptimization() async {
+    try {
+      final intent = AndroidIntent(
+        action: 'android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS',
+        data: 'package:com.example.asistente_remedio',
+      );
+      await intent.launch();
+    } catch (e) {
+      print('[BATTERY] No se pudo abrir configuración: $e');
+    }
   }
 
   // ===============================================
@@ -144,76 +170,81 @@ class FeedbackScheduler {
   // ===============================================
   static Future<void> debugPendingNotifications() async {
     final pending = await notifications.pendingNotificationRequests();
-    print('🔍 [DEBUG] Notificaciones pendientes: ${pending.length}');
+    print('[DEBUG] Notificaciones pendientes: ${pending.length}');
     for (final notif in pending) {
-      print('   - ID: ${notif.id}, Title: ${notif.title}, Scheduled: ${notif.body}');
+      print(
+        ' - ID: ${notif.id}, Title: ${notif.title}, Body: ${notif.body}, Payload: ${notif.payload}',
+      );
     }
   }
 
   // ===============================================
-  // VERIFICAR PERMISOS EN TIEMPO REAL
+  // Verificar canales y permisos
   // ===============================================
   static Future<void> _ensureChannelsAndPermissions() async {
-    if (!Platform.isAndroid) return;
-    
     final androidPlugin = notifications
         .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin
-        >();
-    
-    if (androidPlugin == null) return;
-    
-    // Recrear canales (idempotente, no causa conflicto)
-    const dueChannel = AndroidNotificationChannel(
-      'due_channel',
-      'Recordatorios de hora exacta',
-      description: 'Notifica cuando es la hora exacta del medicamento',
-      importance: Importance.max,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      enableLights: true,
-    );
+            AndroidFlutterLocalNotificationsPlugin>();
 
-    const feedbackChannel = AndroidNotificationChannel(
-      'feedback_channel',
-      'Recordatorios diferidos',
-      description: 'Preguntas sobre tomas no marcadas a la hora',
-      importance: Importance.max,
-      playSound: true,
-      enableVibration: true,
-      showBadge: true,
-      enableLights: true,
-    );
-
-    try {
-      await androidPlugin.createNotificationChannel(dueChannel);
-      await androidPlugin.createNotificationChannel(feedbackChannel);
-    } catch (e) {
-      print('ℹ️  Canales ya existen: $e');
+    if (androidPlugin == null) {
+      print('[ERROR] AndroidFlutterLocalNotificationsPlugin es null');
+      return;
     }
-    
-    // Verificar permisos actuales
-    _hasNotificationPermission =
-        await androidPlugin.requestNotificationsPermission() ?? false;
-    _hasExactAlarmPermission =
-        await androidPlugin.requestExactAlarmsPermission() ?? false;
+
+    await androidPlugin.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _dueChannelId,
+        'Recordatorios de hora exacta',
+        description: 'Recordatorios programados',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('pills'),
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+
+    await androidPlugin.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _feedbackChannelId,
+        'Recordatorios diferidos',
+        description: 'Notificación si no tomaste el medicamento',
+        importance: Importance.max,
+        playSound: true,
+        enableVibration: true,
+        sound: RawResourceAndroidNotificationSound('pills'),
+        audioAttributesUsage: AudioAttributesUsage.alarm,
+      ),
+    );
+
+    if (!_hasNotificationPermission) {
+      _hasNotificationPermission =
+          await androidPlugin.requestNotificationsPermission() ?? false;
+    }
+
+    if (!_hasExactAlarmPermission) {
+      _hasExactAlarmPermission =
+          await androidPlugin.requestExactAlarmsPermission() ?? false;
+    }
   }
 
   // ===============================================
-  // CANCELAR NOTIFICACIONES PREVIAS
+  // Cancelar notificación previa
   // ===============================================
   static Future<void> _cancelPreviousNotification(int notificationId) async {
     try {
       await notifications.cancel(notificationId);
-      print('🗑️  Notificación previa cancelada: $notificationId');
     } catch (e) {
-      print('⚠️  No se pudo cancelar notificación anterior: $e');
+      print('[CANCEL] No se pudo cancelar notificación anterior: $e');
     }
   }
 
+  static Future<void> cancelNotification(int reminderId) async {
+    await _cancelPreviousNotification(reminderId);
+  }
+
   // ===============================================
-  // NOTIFICACIÓN DIFERIDA
+  // Notificación diferida
   // ===============================================
   static Future<void> scheduleDeferredForReminder({
     required int reminderId,
@@ -221,11 +252,10 @@ class FeedbackScheduler {
     required String medication,
     required String scheduledHour,
   }) async {
-    // Asegurar canales y permisos antes de programar
     await _ensureChannelsAndPermissions();
 
     if (!_hasNotificationPermission) {
-      print('⚠️  [DIFERIDA] Sin permiso POST_NOTIFICATIONS, abortando');
+      print('[DIFERIDA] Sin permiso POST_NOTIFICATIONS, abortando');
       return;
     }
 
@@ -233,79 +263,24 @@ class FeedbackScheduler {
     await _cancelPreviousNotification(notificationId);
 
     final random = Random();
-    final future = DateTime.now().add(
-      Duration(minutes: 20 + random.nextInt(40)),
+    final delayMinutes = 20 + random.nextInt(40);
+    final future = DateTime.now().add(Duration(minutes: delayMinutes));
+
+    await NotificationWorker.scheduleNotification(
+      id: notificationId,
+      title: "¿Lo tomaste?",
+      body: "$medication no fue tomado a las $scheduledHour",
+      when: future,
+      payload: "missed|$reminderId|$patientCode",
+      sound: 'pills',
+      channelId: _feedbackChannelId,
     );
 
-    final tzDate = tz.TZDateTime(
-      tz.getLocation("America/Santiago"),
-      future.year,
-      future.month,
-      future.day,
-      future.hour,
-      future.minute,
-      future.second,
-    );
-
-    print('📌 [NOTIF DIFERIDA] Programando notificación diferida:');
-    print('   ID: $notificationId');
-    print('   Medicamento: $medication');
-    print('   Fecha/Hora: $tzDate');
-    print('   Permiso exacto: $_hasExactAlarmPermission');
-
-    try {
-      await notifications.zonedSchedule(
-        notificationId,
-        "¿Lo tomaste?",
-        "Olvidaste marcar el $medication a las $scheduledHour, ¿lo tomaste?",
-        tzDate,
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            "feedback_channel",
-            "Recordatorios diferidos",
-            importance: Importance.max,
-            priority: Priority.max,
-          ),
-        ),
-        payload: "missed|$reminderId|$patientCode",
-        androidScheduleMode: _hasExactAlarmPermission
-            ? AndroidScheduleMode.exactAllowWhileIdle
-            : AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: null,
-      );
-
-      print('✅ Notificación diferida programada');
-    } catch (e) {
-      print('❌ [ERROR DIFERIDA] $e');
-      print('   Reintentando con modo inexacto...');
-
-      try {
-        await notifications.zonedSchedule(
-          notificationId,
-          "¿Lo tomaste?",
-          "Olvidaste marcar el $medication a las $scheduledHour, ¿lo tomaste?",
-          tzDate,
-          const NotificationDetails(
-            android: AndroidNotificationDetails(
-              "feedback_channel",
-              "Recordatorios diferidos",
-              importance: Importance.max,
-              priority: Priority.max,
-            ),
-          ),
-          payload: "missed|$reminderId|$patientCode",
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          matchDateTimeComponents: null,
-        );
-        print('✅ Notificación diferida programada (inexacto)');
-      } catch (e2) {
-        print('❌ [ERROR CRÍTICO DIFERIDA] $e2');
-      }
-    }
+    print('[DIFERIDA] Notificación diferida programada');
   }
 
   // ===============================================
-  // NOTIFICACIÓN DE HORA EXACTA
+  // Notificación de hora exacta
   // ===============================================
   static Future<void> scheduleDueReminder({
     required int reminderId,
@@ -314,101 +289,102 @@ class FeedbackScheduler {
     required String hour,
     required DateTime when,
   }) async {
-    // Asegurar canales y permisos antes de programar
     await _ensureChannelsAndPermissions();
 
     if (!_hasNotificationPermission) {
-      print('⚠️  [DUE] Sin permiso POST_NOTIFICATIONS, abortando');
+      print("[DUE] Sin permiso POST_NOTIFICATIONS.");
       return;
     }
 
-    final notificationId = 2000 + reminderId;
+    final now = DateTime.now();
+    if (when.isBefore(now)) {
+      final fallback = now.add(const Duration(minutes: 1));
+      print("[DUE] Hora pasada ($when). Reprogramando en 1 min: $fallback");
+      when = fallback;
+    }
 
-    // Cancelar notificación anterior
-    await _cancelPreviousNotification(notificationId);
-
-    final tzDate = tz.TZDateTime(
-      tz.getLocation("America/Santiago"),
-      when.year,
-      when.month,
-      when.day,
-      when.hour,
-      when.minute,
-      when.second,
+    await NotificationWorker.scheduleNotification(
+      id: reminderId,
+      title: "¡Hora de tu medicamento!",
+      body: "$medication a las $hour",
+      when: when,
+      payload: "due|$reminderId|$code",
+      sound: 'pills',
+      channelId: _dueChannelId,
     );
 
-    print('📌 [NOTIF DUE] Programando notificación exacta:');
-    print('   ID: $notificationId');
-    print('   Medicamento: $medication');
-    print('   Hora programada: $hour');
-    print('   DateTime: $when');
-    print('   TZDateTime: $tzDate');
-    print('   Permiso exacto: $_hasExactAlarmPermission');
+    print('[DUE] Notificación programada con WorkManager');
+  }
 
-    // Si la hora ya pasó, no programar
-    if (when.isBefore(DateTime.now())) {
-      print('⚠️  La hora ya pasó, no se programa');
+  // ===============================================
+  // Test inmediata
+  // ===============================================
+  static Future<void> testImmediateNotification() async {
+    print('[TEST] Enviando notificación de prueba inmediata...');
+
+    try {
+      await notifications.show(
+        9999,
+        "🧪 Notificación de Prueba",
+        "Si ves esto, el sistema de notificaciones funciona",
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            _dueChannelId,
+            'Recordatorios de hora exacta',
+            importance: Importance.max,
+            priority: Priority.max,
+            playSound: true,
+            enableVibration: true,
+            enableLights: true,
+            sound: RawResourceAndroidNotificationSound('pills'),
+          ),
+        ),
+        payload: 'test',
+      );
+      print('[TEST] Notificación enviada');
+    } catch (e) {
+      print('[TEST] Error: $e');
+    }
+  }
+
+  // ===============================================
+  // Test programada 5s
+  // ===============================================
+  static Future<void> testScheduledNotification() async {
+    print('[TEST] Programando notificación para 5 segundos...');
+
+    await _ensureChannelsAndPermissions();
+
+    if (!_hasNotificationPermission) {
+      print('[TEST] Sin permiso POST_NOTIFICATIONS');
       return;
     }
 
-    try {
-      await notifications.zonedSchedule(
-        notificationId,
-        "Es hora de tu medicamento",
-        "Toca para marcar tu $medication",
-        tzDate,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            "due_channel",
-            "Recordatorios de hora exacta",
-            importance: Importance.max,
-            priority: Priority.max,
-            fullScreenIntent: true,
-            color: const Color.fromARGB(255, 64, 145, 108),
-            enableVibration: true,
-            playSound: true,
-            audioAttributesUsage: AudioAttributesUsage.alarm,
-          ),
-        ),
-        payload: "due|$reminderId|$code",
-        androidScheduleMode: _hasExactAlarmPermission
-            ? AndroidScheduleMode.exactAllowWhileIdle
-            : AndroidScheduleMode.inexactAllowWhileIdle,
-        matchDateTimeComponents: null,
-      );
-
-      print('✅ Notificación exacta programada');
-    } catch (e) {
-      print('❌ [ERROR DUE] $e');
-      print('   Reintentando con modo inexacto...');
-
+    Future.delayed(const Duration(seconds: 5), () async {
       try {
-        await notifications.zonedSchedule(
-          notificationId,
-          "Es hora de tu medicamento",
-          "Toca para marcar tu $medication",
-          tzDate,
-          NotificationDetails(
+        await notifications.show(
+          9998,
+          "🧪 Notificación Programada",
+          "Programada para 5 segundos después",
+          const NotificationDetails(
             android: AndroidNotificationDetails(
-              "due_channel",
-              "Recordatorios de hora exacta",
+              _dueChannelId,
+              'Recordatorios de hora exacta',
               importance: Importance.max,
               priority: Priority.max,
-              fullScreenIntent: true,
-              color: const Color.fromARGB(255, 64, 145, 108),
-              enableVibration: true,
               playSound: true,
-              audioAttributesUsage: AudioAttributesUsage.alarm,
+              enableVibration: true,
+              enableLights: true,
+              sound: RawResourceAndroidNotificationSound('pills'),
             ),
           ),
-          payload: "due|$reminderId|$code",
-          androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-          matchDateTimeComponents: null,
         );
-        print('✅ Notificación exacta programada (inexacto)');
-      } catch (e2) {
-        print('❌ [ERROR CRÍTICO DUE] $e2');
+        print('[TEST] Notificación mostrada después de 5 segundos');
+      } catch (e) {
+        print('[TEST] Error mostrando notificación: $e');
       }
-    }
+    });
+
+    print('[TEST] Notificación programada (5s)');
   }
 }
